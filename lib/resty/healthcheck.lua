@@ -32,6 +32,20 @@ local _M = {}
 
 
 --[[
+
+* Each worker will instance of the checker
+* They will two timer loops, `healthy_callback` and `unhealthy_callback`
+  * typically, unhealthy runs faster than healthy
+    (especially on passive checks: healthy comes from normal traffic, unhealthy needs checks to get upstream back to healthy status)
+* When a status changes, we want workers to be notified as soon as possible
+  * We don't want to rely on the two `healthy_callback` and `unhealthy_callback` above for that
+  * A worker will determine that a status has changed
+    * Health management functions (report_*) will determine a status change based on fall and rise strategies, and post an event via worker-events
+      * Those functions can be called by the periodic callbacks, or directly (in the case of passive checks)
+      * Those functions are the only ones that lock and update the occurence counters
+* Provide a convenience method to register a callback that listens on the worker-events status change event
+	* This keeps the worker-events dependency internal to the healthcheck library
+
 Event handling
 
 Where do we register callbacks? here, or in for example resty-worker-events
@@ -61,6 +75,14 @@ Timer management:
   - 2 timers, one for healthy, one for unhealthy
   - using lock mechanism from upstream-healthcheck library to ensure independence
   - GC-able timers, or manual timer-stopping
+
+
+SHM storage
+ - data types:
+    - list of targets + healthcheck 'execution' data
+    - individual health data per target
+ - for now serialize as json in shm
+
 --]]
 
 
@@ -95,6 +117,7 @@ end
 -- Status management
 --============================================================================
 
+--[[ (not for the first iteration)
 --- Gets the current status of the target
 -- @param ip ip-address of the target being checked
 -- @param port the port being checked against
@@ -102,20 +125,45 @@ end
 function checker:get_target_status(ip, port)
   
   -- TODO: implement
+  -- needs to lock the same data that report_* functions lock
+  -- alternative is to keep a cache and return potentially outdated data
   
 end
+]]
 
+--[[ (not for the first iteration)
 --- Sets the current status of the target.
 -- This will immediately set the status, it will not count against
 -- failure/success count.
 -- @param ip ip-address of the target being checked
 -- @param port the port being checked against
 -- @return `true` on success, or nil+error on failure
-function checker:set_target_status(ip, port, healthy)
+function checker:set_target_status(ip, port, enabled)
+  -- What is this function setting? it should not set the status but the "status-info"
+  -- that defines wheter it is up/down.
+  -- Eg. 100 successes in a row, then we call this to set it down anyway.
+  -- The next healthcheck is a success. Now what is going to happen?
+
+  -- OPTION: if status is set to `false` then it is marked `down` and
+  -- excluded from the healthchecks (or any other health info from the
+  -- health management functions). If status is set to `true` it will be checked
+  -- and health info will be collected
   
+  -- OPTION: Will mark a node as down, and keep it down, indepedent of received health data.
+  -- When the change to down is a change in status, an event will be sent.
+  -- While down healthchecks will continue, but not influence the state.
+  -- When reenabling the checks, the last state, according to the last health data
+  -- receieved (during the time the node was forcefully down) will detrmine the new status
+
+  -- OPTION: if status is set to `false` then it is marked `disabled` and
+  -- healthchecks keep going but do not report events. If status is set to `true`
+  -- it will start reporting status changes again. Also reports a `enabled`/`disabled` event.
+ 
+
   -- TODO: implement
   
 end
+]]
 
 --============================================================================
 -- Health management
@@ -157,17 +205,28 @@ function checker:report_http_status(ip, port, req_status)
   
 end
 
+-- TODO check what kind of information we get from the OpenResty layer
+-- in order to tell these error conditions apart
+-- https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/balancer.md#get_last_failure
 function checker:report_tcp_failure(ip, port)
   
   -- TODO: implement
   
 end
 
--- TODO: method also for timeouts maybe?
+function checker:report_timeout(ip, port)
+  
+  -- TODO: implement
+  
+end
+
 
 --============================================================================
 -- Timer callbacks
 --============================================================================
+-- The timer callbacks are responsible for checking the status, upon success/
+-- failure they will call the health-management functions to deal with the
+-- results of the checks.
 
 -- Timer callback to check the status of currently HEALTHY targets
 function checker.healthy_callback(premature, self)
@@ -252,7 +311,7 @@ end
 
 --[[
   {
-      name = "some unique name"                           -- needed as key in shm
+      name = "some unique name"                                   -- needed as key in shm
       shm = "healthcheck"   																			-- hidden in worker-events??
       type = "http"                                               -- http, https, tcp
       http_req = "GET /status HTTP/1.0\r\nHost: foo.com\r\n\r\n"  -- raw request?
