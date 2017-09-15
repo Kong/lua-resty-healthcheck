@@ -12,14 +12,20 @@ local cjson = require("cjson.safe").new()
 local get_pid = ngx.worker.pid
 local now = ngx.now
 local sleep = ngx.sleep
-local tinsert = table.insert
-local tremove = table.remove
+local table_insert = table.insert
+local table_remove = table.remove
 local utils = require("resty.healthcheck.utils")
 local resty_lock = require ("resty.lock")
+local re_find = ngx.re.find
 
 -- constants
 local LOG_PREFIX = "[healthcheck] "
 local SHM_PREFIX = "lua-resty-healthcheck:"
+local EMPTY = setmetatable({},{
+    __newindex = function()
+      error("the EMPTY table is read only, check your code!", 2)
+    end
+  })
 
 -- defaults
 local DEFAULT_TIMEOUT = 2
@@ -146,7 +152,7 @@ function checker:add_target(ip, port, healthy)
 
   else
     if target_list then
-      target_list = deserialize(targetlist)
+      target_list = deserialize(target_list)
     else
       target_list = {}
     end
@@ -211,7 +217,6 @@ end
 function checker:remove_target(ip, port)
   ip   = tostring(assert(ip, "no ip address provided"))
   port = tostring(assert(ip, "no port number provided"))
-  healthy = not not healthy   -- force to boolean
 
   local lock, err, ok, err2, target_list
   
@@ -230,7 +235,7 @@ function checker:remove_target(ip, port)
 
   else
     if target_list then
-      target_list = deserialize(targetlist)
+      target_list = deserialize(target_list)
     else
       target_list = {}
     end
@@ -240,7 +245,7 @@ function checker:remove_target(ip, port)
     for i, target in ipairs(target_list) do
       if target.ip == ip and target.port == port then
         target_found = target
-        table.remove(target_list, i)
+        table_remove(target_list, i)
         break
       end
     end
@@ -372,6 +377,7 @@ end
 -- is in neither strategy, it will be ignored.
 -- @param ip ip-address of the target being checked
 -- @param port the port being checked against
+-- @param req_status the http statuscode, or nil to report an invalid http response
 -- @return `true` on success, or nil+error on failure
 function checker:report_http_status(ip, port, req_status)
   
@@ -405,84 +411,75 @@ end
 -- Runs a single healthcheck probe
 function checker:run_single_check(ip, port, healthy)
   
-  -- TODO: implement, the below is a straight copy of open-resty healthcheck
+  local sock, err = ngx.socket.tcp()
+  if not sock then
+    self:log(ERR, "failed to create stream socket: ", err)
+    return
+  end
 
+  sock:settimeout(self.timeout)
 
-    local http_request = ctx.http_req
-
-    local sock, err = ngx.socket.tcp()
-    if not sock then
-      self:log(ERR, "failed to create stream socket: ", err)
-      return
+  local ok
+  ok, err = sock:connect(ip, port)
+  if not ok then
+    if not healthy then
+      self:log(ERR, "failed to connect to '", ip, ":", port, "': ", err)
     end
-
-    sock:settimeout(self.timeout)
-
-    ok, err = sock:connect(ip, port)
-    if not ok then
-      if not healthy then
-        self:log(ERR, "failed to connect to '", ip, ":", port, "': ",err)
-      end
-      if err:find("timeout") then
-        return self:report_timeout(ip, port)
-      end
-      return self:report_tcp_failure(ip, port)
+    if err == "timeout" then
+      sock:close()  -- timeout errors do not close the socket.
+      return self:report_timeout(ip, port)
     end
+    return self:report_tcp_failure(ip, port)
+  end
+  
+  if self.type == "tcp" then
+    return self:report_tcp_success()  --TODO: does not exist yet
+  end
 
-    local bytes, err = sock:send(self.http_request)
-    if not bytes then
-      if not healthy then
-        self:log(ERR, "failed to send http request to '", ip, ":", port, "': ",err)
-      end
-      if err:find("timeout") then
-        return self:report_timeout(ip, port)
-      end
-      return self:report_tcp_failure(ip, port)
+  -- TODO: implement https
+
+  local bytes
+  bytes, err = sock:send(self.http_request)
+  if not bytes then
+    self:log(ERR, "failed to send http request to '", ip, ":", port, "': ", err)
+    if err == "timeout" then
+      sock:close()  -- timeout errors do not close the socket.
+      return self:report_timeout(ip, port)
     end
+    return self:report_tcp_failure(ip, port)
+  end
 
--- continue from here with conversion
-
-    local status_line, err = sock:receive()
-    if not status_line then
-        peer_error(ctx, is_backup, id, peer,
-                   "failed to receive status line from ", name, ": ", err)
-        if err == "timeout" then
-            sock:close()  -- timeout errors do not close the socket.
-        end
-        return
+  local status_line
+  status_line, err = sock:receive()
+  if not status_line then
+    self:log(ERR, "failed to receive status line from '", ip, ":", port, "': ", err)
+    if err == "timeout" then
+      sock:close()  -- timeout errors do not close the socket.
+      return self:report_timeout(ip, port)
     end
+    return self:report_tcp_failure(ip, port)
+  end
 
-    if statuses then
-        local from, to, err = re_find(status_line,
-                                      [[^HTTP/\d+\.\d+\s+(\d+)]],
-                                      "joi", nil, 1)
-        if not from then
-            peer_error(ctx, is_backup, id, peer,
-                       "bad status line from ", name, ": ",
-                       status_line)
-            sock:close()
-            return
-        end
+  local from, to = re_find(status_line,
+                          [[^HTTP/\d+\.\d+\s+(\d+)]],
+                          "joi", nil, 1)
+  local status
+  if from then
+    status = tonumber(status_line:sub(from, to))
+  else
+    self:log(ERR, "bad status line from  '", ip, ":", port, "': ", status_line)
+    -- note: 'status' will be reported as 'nil'
+  end
 
-        local status = tonumber(sub(status_line, from, to))
-        if not statuses[status] then
-            peer_error(ctx, is_backup, id, peer, "bad status code from ",
-                       name, ": ", status)
-            sock:close()
-            return
-        end
-    end
+  sock:close()
 
-    peer_ok(ctx, is_backup, id, peer)
-    sock:close()
-
-
+  return self:report_http_status(ip, port, status)
 end
 
 -- executes a work package (a list of checks) sequentially
 function checker:run_work_package(work_package)
   for _, target in ipairs(work_package) do
-    self:run_single_check(work_package.ip, work_package.port)
+    self:run_single_check(target.ip, target.port)
   end
 end
 
@@ -607,7 +604,7 @@ function checker:event_handler(event_name, ip, port)
       -- remove from list part
       for i, target in ipairs(self.targets) do
         if target.ip == ip and target.port == port then
-          table.remove(self.targets, i)
+          table_remove(self.targets, i)
           break
         end
       end
@@ -621,13 +618,15 @@ function checker:event_handler(event_name, ip, port)
          event_name == self.events.unhealthy then
     if not target_found then
       -- it is a new target, must add it first
+      local target_found = { ip = ip, port = port }
       self.targets[target_found.ip] = self.targets[target_found.ip] or {}
-      self.targets[target_found.ip][target_found.port] = target
+      self.targets[target_found.ip][target_found.port] = target_found
+      self.targets[#self.targets + 1] = target_found
       self:log(DEBUG, "event received: target added ", ip, ":", port)
     end
     local health = (event_name == self.events.healthy)
     self:log(DEBUG, "event received target status '", ip, ":", port,
-                    "' from '", target.healthy, "' to '", health, "'")
+                    "' from '", target_found.healthy, "' to '", health, "'")
     target_found.healthy = health
 
   else
@@ -722,7 +721,8 @@ end
 --- Creates a new health-checker instance.
 -- @param opts table with checker options
 -- @return checker object, or nil + error
-local function new(opts)
+function _M.new(opts)
+  local err
   local self = {
     -- options defaults
     concurrency = 10,    -- how many concurrent requests while probing
