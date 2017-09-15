@@ -398,10 +398,80 @@ end
 --============================================================================
 
 -- Runs a single healthcheck probe
-function checker:run_single_check(ip, port)
+function checker:run_single_check(ip, port, healthy)
   
-  -- TODO: implement
-  
+  -- TODO: implement, the below is a straight copy of open-resty healthcheck
+
+
+    local http_request = ctx.http_req
+
+    local sock, err = ngx.socket.tcp()
+    if not sock then
+      self:log(ERR, "failed to create stream socket: ", err)
+      return
+    end
+
+    sock:settimeout(self.timeout)
+
+    ok, err = sock:connect(ip, port)
+    if not ok then
+      if not healthy then
+        self:log(ERR, "failed to connect to '", ip, ":", port, "': ",err)
+      end
+      if err:find("timeout") then
+        return self:report_timeout(ip, port)
+      end
+      return self:report_tcp_failure(ip, port)
+    end
+
+    local bytes, err = sock:send(self.http_request)
+    if not bytes then
+      if not healthy then
+        self:log(ERR, "failed to send http request to '", ip, ":", port, "': ",err)
+      end
+      if err:find("timeout") then
+        return self:report_timeout(ip, port)
+      end
+      return self:report_tcp_failure(ip, port)
+    end
+
+-- continue from here with conversion
+
+    local status_line, err = sock:receive()
+    if not status_line then
+        peer_error(ctx, is_backup, id, peer,
+                   "failed to receive status line from ", name, ": ", err)
+        if err == "timeout" then
+            sock:close()  -- timeout errors do not close the socket.
+        end
+        return
+    end
+
+    if statuses then
+        local from, to, err = re_find(status_line,
+                                      [[^HTTP/\d+\.\d+\s+(\d+)]],
+                                      "joi", nil, 1)
+        if not from then
+            peer_error(ctx, is_backup, id, peer,
+                       "bad status line from ", name, ": ",
+                       status_line)
+            sock:close()
+            return
+        end
+
+        local status = tonumber(sub(status_line, from, to))
+        if not statuses[status] then
+            peer_error(ctx, is_backup, id, peer, "bad status code from ",
+                       name, ": ", status)
+            sock:close()
+            return
+        end
+    end
+
+    peer_ok(ctx, is_backup, id, peer)
+    sock:close()
+
+
 end
 
 -- executes a work package (a list of checks) sequentially
@@ -459,7 +529,11 @@ function checker.healthy_callback(premature, self)
   local list_to_check = {}
   for _, target in ipairs(self.targets) do
     if target.healthy then  -- only healthy ones
-      list_to_check[#list_to_check + 1] = { ip = target.ip, port = target.port }
+      list_to_check[#list_to_check + 1] = {
+            ip = target.ip,
+            port = target.port,
+            healthy = target.healthy,
+      }
     end
   end
   
@@ -647,6 +721,8 @@ local function new(opts)
   local self = {
     -- options defaults
     concurrency = 10,    -- how many concurrent requests while probing
+    timeout = 1000,      -- network timeout for probes
+    http_request = nil,  -- raw http request to send
     -- other properties
     targets = nil,   -- list of targets, initially loaded, maintained by events
     events = nil,    -- hash table with supported events (prevent magic strings)
