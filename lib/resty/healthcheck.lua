@@ -167,19 +167,21 @@ function checker:add_target(ip, port, healthy)
       }
       target_list = serialize(target_list)
 
+      -- we first add the health status, and only then the updated list
+      -- this prevents race conditions when a healthcheker get the initial
+      -- state from the shm
+      ok, err2 = self.shm.set(self.TARGET_STATUS:format(ip, port), healthy)
+      if not ok then
+        -- err2: not failing this routine, just log the error and continue
+        self.log(ERR, "failed to set initial health status in shm: ", err2)
+      end
+
       ok, err = self.shm.set(self.TARGET_LIST_KEY, target_list)
       if not ok then
         err = "failed to store target_list in shm: " .. err
       end
 
       if not err then
-        -- add health status to shm
-        ok, err2 = self.shm.set(self.TARGET_STATUS:format(ip, port), healthy)
-        if not ok then
-          -- err2: not failing this routine, just log the error and continue
-          self.log(ERR, "failed to set initial health status in shm: ", err2)
-        end
-
         -- raise event for our newly added target
         if healthy then
           self.raise_event(self.events.healthy, ip, port)
@@ -247,6 +249,9 @@ function checker:remove_target(ip, port)
       -- go update the shm
       target_list = serialize(target_list)
 
+      -- we first write the updated list, and only then remove the health 
+      -- status this prevents race conditions when a healthcheker get the
+      -- initial state from the shm
       ok, err = self.shm.set(self.TARGET_LIST_KEY, target_list)
       if not ok then
         err = "failed to store target_list in shm: " .. err
@@ -776,8 +781,6 @@ local function new(opts)
       self.targets[target.ip] = self.targets[target.ip] or {}
       self.targets[target.ip][target.port] = target
     end
-    -- TODO: here we need to poll for events, so any changes between fetching the
-    -- list and reading the individual statusses get synced.
   end
 
   -- start timers
