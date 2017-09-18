@@ -63,7 +63,7 @@ local _M = {}
   * A worker will determine that a status has changed
     * Health management functions (report_*) will determine a status change based on fall and rise strategies, and post an event via worker-events
       * Those functions can be called by the periodic callbacks, or directly (in the case of passive checks)
-      * Those functions are the only ones that lock and update the occurence counters
+      * Those functions are the only ones that lock and update the occurrence counters
 * Provide a convenience method to register a callback that listens on the worker-events status change event
   * This keeps the worker-events dependency internal to the healthcheck library
 
@@ -399,45 +399,44 @@ end
 -- @return True if succeeded, or nil and an error message.
 local function incr_counter(self, mode, ip, port)
 
+  local target = (self.targets[ip] or EMPTY)[port]
+  if not target then
+    -- sync issue: warn, but return success
+    self.log(WARN, "trying to increment a target that is not in the list: ", ip, ":", port)
+    return true
+  end
+  
+  if (mode == "healthy" and target.healthy) or
+     (mode == "unhealthy" and not target.healthy) then
+    -- No need to count successes when healthy or failures when unhealthy
+    return true
+  end
+
   return locking_target(self, ip, port, function()
 
-    -- No need to count successes when healthy or failures when unhealthy
-    local status_key = get_shm_key(self.TARGET_STATUS, ip, port)
-    local status, err = self.shm:get(status_key)
-    if err then
-      return nil, err
-    end
-    if status == mode then
-      return true
-    end
-
-    local counter, other, config
+    local counter, other, limit
     if mode == "healthy" then
       counter = self.TARGET_OKS
       other   = self.TARGET_NOKS
-      config  = self.healthy_config
+      limit  = self.healthy_config.occurrences
     else
       counter = self.TARGET_NOKS
       other   = self.TARGET_OKS
-      config  = self.unhealthy_config
+      limit  = self.unhealthy_config.occurrences
     end
 
     local counter_key = get_shm_key(counter, ip, port)
-    local ctr, err = self.shm:get(counter_key)
+    local ctr, err = self.shm:incr(counter_key, 1, 0)
     if err then
       return nil, err
     end
-    if not ctr then
-      ctr = 0
-    end
-    ctr = ctr + 1
-    self.shm:set(counter_key, ctr)
     if ctr == 1 then
       local other_key = get_shm_key(other, ip, port)
       self.shm:set(other_key, 0)
     end
 
-    if ctr >= config.occurrences then
+    if ctr >= limit then
+      local status_key = get_shm_key(self.TARGET_STATUS, ip, port)
       self.shm:set(status_key, mode == "healthy")
       self:raise_event(self.events[mode], ip, port)
     end
@@ -450,7 +449,7 @@ end
 
 
 --- Report a health failure.
--- Reports a health failure which will count against the number of occurences
+-- Reports a health failure which will count against the number of occurrences
 -- required to make a target "fall" or "rise".
 -- @param ip ip-address of the target being checked
 -- @param port the port being checked against
@@ -463,7 +462,7 @@ end
 
 
 --- Report a health success.
--- Reports a health success which will count against the number of occurences
+-- Reports a health success which will count against the number of occurrences
 -- required to make a target "fall" or "rise".
 -- @param ip ip-address of the target being checked
 -- @param port the port being checked against
@@ -814,12 +813,12 @@ end
       timeout = 1000,                                            -- 1 sec is the timeout for network operations
       unhealthy_config = {
         interval = 500,                                          -- run the check cycle every 0.5 sec on healthy nodes
-        occurences = 4,                                          -- successive failures for marking a peer unhealthy
+        occurrences = 4,                                         -- successive failures for marking a peer unhealthy
         statuses = {429},                                        -- a list of HTTP status codes to make it fail
       }
       healthy_config = {
         interval = 2000,                                         -- run the check cycle every 2 sec on healthy nodes
-        occurences = 4,                                          -- successive failures for marking a peer healthy
+        occurrences = 4,                                         -- successive failures for marking a peer healthy
         statuses = {200, 302},                                   -- a list of HTTP status codes to make it succeed
       }
       concurrency = 10,  -- concurrency level for test requests
