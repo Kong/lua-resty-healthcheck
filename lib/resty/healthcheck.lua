@@ -122,8 +122,8 @@ local function deserialize(s)
 end
 
 
-local function get_key(name, ip, port)
-  return name .. ":" .. ip .. ":" .. port
+local function get_shm_key(key_prefix, ip, port)
+  return key_prefix .. ":" .. ip .. ":" .. port
 end
 
 
@@ -135,8 +135,10 @@ local checker = {}
 --============================================================================
 
 
+-- @return the atregt list from the shm, an empty table if not found, or
+-- nil+error upon a failure
 local function fetch_target_list(self)
-  local target_list, err = self.shm.get(self.TARGET_LIST)
+  local target_list, err = self.shm:get(self.TARGET_LIST)
   if err then
     return nil, "failed to fetch target_list from shm: " .. err
   end
@@ -146,6 +148,8 @@ end
 
 
 --- Run the given function holding a lock on the target list.
+-- WARNING: the callback will run unprotected, so it should never
+-- throw an error, but always return nil+error instead.
 -- @param self The checker object
 -- @param fn The function to execute
 -- @return The results of the function; or nil and an error message
@@ -167,21 +171,22 @@ local function locking_target_list(self, fn)
 
   local target_list, err = fetch_target_list(self)
 
-  local fn_ok, fn_err
+  local final_ok, final_err
 
   if target_list then
-    fn_ok, fn_err = fn(target_list)
+    final_ok, final_err = fn(target_list)
   else
-    fn_ok, fn_err = nil, err
+    final_ok, final_err = nil, err
   end
 
   ok, err = lock:unlock()
   if not ok then
+    -- recoverable: not returning this error, only logging it
     self.log(ERR, "failed to release lock '", self.TARGET_LIST_LOCK,
                   "': ", err)
   end
 
-  return fn_ok, fn_err
+  return final_ok, final_err
 end
 
 
@@ -218,12 +223,12 @@ function checker:add_target(ip, port, healthy)
     -- we first add the health status, and only then the updated list.
     -- this prevents a state where a target is in the list, but does not
     -- have a key in the shm.
-    local ok, err = self.shm.set(get_key(self.TARGET_STATUS, ip, port), healthy)
+    local ok, err = self.shm:set(get_shm_key(self.TARGET_STATUS, ip, port), healthy)
     if not ok then
       self.log(ERR, "failed to set initial health status in shm: ", err)
     end
 
-    ok, err = self.shm.set(self.TARGET_LIST, target_list)
+    ok, err = self.shm:set(self.TARGET_LIST, target_list)
     if not ok then
       return nil, "failed to store target_list in shm: " .. err
     end
@@ -268,13 +273,13 @@ function checker:remove_target(ip, port)
     -- we first write the updated list, and only then remove the health
     -- status this prevents race conditions when a healthcheker get the
     -- initial state from the shm
-    local ok, err = self.shm.set(self.TARGET_LIST, target_list)
+    local ok, err = self.shm:set(self.TARGET_LIST, target_list)
     if not ok then
       return nil, "failed to store target_list in shm: " .. err
     end
 
     -- remove health status from shm
-    ok, err = self.shm.set(get_key(self.TARGET_STATUS, ip, port), nil)
+    ok, err = self.shm:set(get_shm_key(self.TARGET_STATUS, ip, port), nil)
     if not ok then
       self.log(ERR, "failed to remove health status from shm: ", err)
     end
@@ -348,6 +353,8 @@ end
 
 
 --- Run the given function holding a lock on the target.
+-- WARNING: the callback will run unprotected, so it should never
+-- throw an error, but always return nil+error instead.
 -- @param self The checker object
 -- @param ip Target IP
 -- @param port Target port
@@ -362,21 +369,22 @@ local function locking_target(self, ip, port, fn)
   if not lock then
     return nil, "failed to create lock:" .. lock_err
   end
-  local lock_key = get_key(self.TARGET_LOCK, ip, port)
+  local lock_key = get_shm_key(self.TARGET_LOCK, ip, port)
 
   local ok, err = lock:lock(lock_key)
   if not ok then
     return nil, "failed to acquire lock: " .. err
   end
 
-  local fn_ok, fn_err = fn()
+  local final_ok, final_err = fn()
 
   ok, err = lock:unlock()
   if not ok then
+    -- recoverable: not returning this error, only logging it
     self.log(ERR, "failed to release lock '", lock_key, "': ", err)
   end
 
-  return fn_ok, fn_err
+  return final_ok, final_err
 end
 
 
@@ -394,8 +402,8 @@ local function incr_counter(self, mode, ip, port)
   return locking_target(self, ip, port, function()
 
     -- No need to count successes when healthy or failures when unhealthy
-    local status_key = get_key(self.TARGET_STATUS, ip, port)
-    local status, err = self.shm.get(status_key)
+    local status_key = get_shm_key(self.TARGET_STATUS, ip, port)
+    local status, err = self.shm:get(status_key)
     if err then
       return nil, err
     end
@@ -414,8 +422,8 @@ local function incr_counter(self, mode, ip, port)
       config  = self.unhealthy_config
     end
 
-    local counter_key = get_key(counter, ip, port)
-    local ctr, err = self.shm.get(counter_key)
+    local counter_key = get_shm_key(counter, ip, port)
+    local ctr, err = self.shm:get(counter_key)
     if err then
       return nil, err
     end
@@ -423,14 +431,14 @@ local function incr_counter(self, mode, ip, port)
       ctr = 0
     end
     ctr = ctr + 1
-    self.shm.set(counter_key, ctr)
+    self.shm:set(counter_key, ctr)
     if ctr == 1 then
-      local other_key = get_key(other, ip, port)
-      self.shm.set(other_key, 0)
+      local other_key = get_shm_key(other, ip, port)
+      self.shm:set(other_key, 0)
     end
 
     if ctr >= config.occurrences then
-      self.shm.set(status_key, mode == "healthy")
+      self.shm:set(status_key, mode == "healthy")
       self:raise_event(self.events[mode], ip, port)
     end
 
@@ -475,11 +483,12 @@ end
 -- @param http_status the http statuscode, or nil to report an invalid http response
 -- @return `true` on success, or nil+error on failure
 function checker:report_http_status(ip, port, http_status)
+  http_status = tonumber(http_status) or 0
 
   local status_type
   if self.healthy_config.statuses[http_status] then
     status_type = "healthy"
-  elseif self.unhealthy_config.statuses[http_status] then
+  elseif self.unhealthy_config.statuses[http_status] or http_status == 0 then
     status_type = "unhealthy"
   else
     return
@@ -543,7 +552,7 @@ function checker:run_single_check(ip, port, healthy)
   local ok
   ok, err = sock:connect(ip, port)
   if not ok then
-    if not healthy then -- TODO 'if healthy', perhaps?
+    if healthy then
       self:log(ERR, "failed to connect to '", ip, ":", port, "': ", err)
     end
     if err == "timeout" then
@@ -913,7 +922,7 @@ function _M.new(opts)
 
     -- load individual statuses
     for _, target in ipairs(self.targets) do
-      target.healthy = self.shm.get(get_key(self.TARGET_STATUS,
+      target.healthy = self.shm:get(get_shm_key(self.TARGET_STATUS,
                                             target.ip, target.port))
       -- fill-in the hash part for easy lookup
       self.targets[target.ip] = self.targets[target.ip] or {}
