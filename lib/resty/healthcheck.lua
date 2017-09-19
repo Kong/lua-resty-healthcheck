@@ -695,16 +695,51 @@ end
 -- failure they will call the health-management functions to deal with the
 -- results of the checks.
 
-local function make_checker_callback(health_mode, status)
+
+-- @param health_mode either "healthy" or "unhealthy" to indicate what
+-- lock to get.
+-- @return true on success, or false if the lock was not acquired, or nil+err
+-- in case of errors
+function checker:get_periodic_lock(health_mode)
+  local key = self.PERIODIC_LOCK .. health_mode
+  local interval = self.checks.active[health_mode].interval
+
+  -- the lock is held for the whole interval to prevent multiple
+  -- worker processes from sending the test request simultaneously.
+  -- here we substract the lock expiration time by 1ms to prevent
+  -- a race condition with the next timer event.
+  local ok, err = self.shm:add(key, true, interval - 0.001)
+  if not ok then
+    if err == "exists" then
+      return false
+    end
+    self:log("failed to add key \"", key, "\": ", err)
+    return nil
+  end
+  return true
+end
+
+-- @param health_mode either "healthy" or "unhealthy" to indicate what
+-- callback to generate.
+-- @return callback function
+local function make_checker_callback(health_mode)
   local callback
   callback = function(premature, self)
     if premature or self.stop then
       self.timer_count = self.timer_count - 1
       return
     end
+    
+    -- get the periodic lock to prevent multiple workers from
+    -- running the check simultaneously
+    if not self:get_periodic_lock(health_mode) then
+      -- another worker just ran, or is running the healthcheck
+      return
+    end
 
     -- create a list of targets to check, here we can still do this atomically
     local list_to_check = {}
+    local status = (health_mode == "healthy")
     for _, target in ipairs(self.targets) do
       if target.healthy == status then
         list_to_check[#list_to_check + 1] = {
@@ -735,10 +770,10 @@ local function make_checker_callback(health_mode, status)
 end
 
 -- Timer callback to check the status of currently HEALTHY targets
-checker.healthy_callback = make_checker_callback("healthy", true)
+checker.healthy_callback = make_checker_callback("healthy")
 
 -- Timer callback to check the status of currently UNHEALTHY targets
-checker.unhealthy_callback = make_checker_callback("unhealthy", false)
+checker.unhealthy_callback = make_checker_callback("unhealthy")
 
 -- Event handler callback
 function checker:event_handler(event_name, ip, port)
@@ -954,6 +989,7 @@ function _M.new(opts)
   self.TARGET_NOKS      = SHM_PREFIX .. self.name .. ":noks"
   self.TARGET_LIST      = SHM_PREFIX .. self.name .. ":target_list"
   self.TARGET_LIST_LOCK = SHM_PREFIX .. self.name .. ":target_list_lock"
+  self.PERIODIC_LOCK    = SHM_PREFIX .. self.name .. ":period_lock:"
   -- prepare constants
   self.EVENT_SOURCE     = EVENT_SOURCE_PREFIX .. " [" .. self.name .. "]"
   self.LOG_PREFIX       = LOG_PREFIX .. "(" .. self.name .. ") "
