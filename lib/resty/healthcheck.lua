@@ -17,6 +17,7 @@ local table_remove = table.remove
 local utils = require("resty.healthcheck.utils")
 local resty_lock = require ("resty.lock")
 local re_find = ngx.re.find
+local bit = require("bit")
 
 -- constants
 local LOG_PREFIX = "[healthcheck] "
@@ -32,6 +33,13 @@ local DEFAULT_TIMEOUT = 2
 local DEFAULT_INTERVAL = 1
 local DEFAULT_WAIT_MAX = 0.5
 local DEFAULT_WAIT_INTERVAL = 0.010
+
+
+-- Counters: a 32-bit shm integer can hold up to four 8-bit counters.
+-- Here, we are using three.
+local CTR_HTTP    = 0x000000
+local CTR_TCP     = 0x000100
+local CTR_TIMEOUT = 0x010000
 
 
 local EVENTS = setmetatable({}, {
@@ -388,6 +396,22 @@ local function locking_target(self, ip, port, fn)
 end
 
 
+--- Return the value 1 for the counter at `idx` in a multi-counter.
+-- @param idx The shift index specifying which counter to use.
+-- @return The value 1 encoded for the 32-bit multi-counter.
+local function ctr_unit(idx)
+   return bit.lshift(1, idx)
+end
+
+--- Extract the value of the counter at `idx` from multi-counter `val`.
+-- @param val A 32-bit multi-counter holding 4 values.
+-- @param idx The shift index specifying which counter to get.
+-- @return The 8-bit value extracted from the 32-bit multi-counter.
+local function ctr_get(val, idx)
+   return bit.band(bit.rshift(val, idx), 0xff)
+end
+
+
 --- Increment the healthy or unhealthy counter. If the threshold of occurrences
 -- is reached, it changes the status of the target in the shm and posts an
 -- event.
@@ -397,7 +421,7 @@ end
 -- @param ip Target IP
 -- @param port Target port
 -- @return True if succeeded, or nil and an error message.
-local function incr_counter(self, mode, ip, port)
+local function incr_counter(self, health_mode, ip, port, limit, ctr_type)
 
   local target = (self.targets[ip] or EMPTY)[port]
   if not target then
@@ -406,30 +430,30 @@ local function incr_counter(self, mode, ip, port)
     return true
   end
   
-  if (mode == "healthy" and target.healthy) or
-     (mode == "unhealthy" and not target.healthy) then
+  if (health_mode == "healthy" and target.healthy) or
+     (health_mode == "unhealthy" and not target.healthy) then
     -- No need to count successes when healthy or failures when unhealthy
     return true
   end
 
+  local counter, other
+  if health_mode == "healthy" then
+    counter = self.TARGET_OKS
+    other   = self.TARGET_NOKS
+  else
+    counter = self.TARGET_NOKS
+    other   = self.TARGET_OKS
+  end
+
   return locking_target(self, ip, port, function()
 
-    local counter, other, limit
-    if mode == "healthy" then
-      counter = self.TARGET_OKS
-      other   = self.TARGET_NOKS
-      limit  = self.healthy_config.occurrences
-    else
-      counter = self.TARGET_NOKS
-      other   = self.TARGET_OKS
-      limit  = self.unhealthy_config.occurrences
-    end
-
     local counter_key = get_shm_key(counter, ip, port)
-    local ctr, err = self.shm:incr(counter_key, 1, 0)
+    local multictr, err = self.shm:incr(counter_key, ctr_unit(ctr_type), 0)
     if err then
       return nil, err
     end
+
+    local ctr = ctr_get(multictr, ctr_type)
     if ctr == 1 then
       local other_key = get_shm_key(other, ip, port)
       self.shm:set(other_key, 0)
@@ -437,8 +461,8 @@ local function incr_counter(self, mode, ip, port)
 
     if ctr >= limit then
       local status_key = get_shm_key(self.TARGET_STATUS, ip, port)
-      self.shm:set(status_key, mode == "healthy")
-      self:raise_event(self.events[mode], ip, port)
+      self.shm:set(status_key, health_mode == "healthy")
+      self:raise_event(self.events[health_mode], ip, port)
     end
 
     return true
@@ -456,7 +480,11 @@ end
 -- @return `true` on success, or nil+error on failure
 function checker:report_failure(ip, port)
 
-  return incr_counter(self, "unhealthy", ip, port)
+  -- TODO what does an unspecified failure mean
+  local limit = 0 -- FIXME which limit goes here
+  local ctr_type = CTR_HTTP -- FIXME which type goes here
+  
+  return incr_counter(self, "unhealthy", ip, port, limit, ctr_type)
 
 end
 
@@ -469,7 +497,11 @@ end
 -- @return `true` on success, or nil+error on failure
 function checker:report_success(ip, port)
 
-  return incr_counter(self, "healthy", ip, port)
+  -- TODO what does an unspecified success mean
+  local limit = 0 -- FIXME which limit goes here
+  local ctr_type = CTR_HTTP -- FIXME which type goes here
+
+  return incr_counter(self, "healthy", ip, port, limit, ctr_type)
 
 end
 
@@ -481,19 +513,25 @@ end
 -- @param port the port being checked against
 -- @param http_status the http statuscode, or nil to report an invalid http response
 -- @return `true` on success, or nil+error on failure
-function checker:report_http_status(ip, port, http_status)
+function checker:report_http_status(ip, port, http_status, check)
   http_status = tonumber(http_status) or 0
 
-  local status_type
-  if self.healthy_config.statuses[http_status] then
+  local checks = self.checks[check]
+
+  local status_type, limit
+  if checks.healthy.http_statuses[http_status] then
     status_type = "healthy"
-  elseif self.unhealthy_config.statuses[http_status] or http_status == 0 then
+    limit = checks.healthy.successes
+  elseif (not http_status)
+         or checks.unhealthy.http_statuses[http_status]
+         or http_status == 0 then
     status_type = "unhealthy"
+    limit = checks.unhealthy.http_errors
   else
     return
   end
 
-  return incr_counter(self, status_type, ip, port)
+  return incr_counter(self, status_type, ip, port, limit, CTR_HTTP)
 
 end
 
@@ -505,29 +543,31 @@ end
 -- TODO check what kind of information we get from the OpenResty layer
 -- in order to tell these error conditions apart
 -- https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/balancer.md#get_last_failure
-function checker:report_tcp_failure(ip, port, operation)
+function checker:report_tcp_failure(ip, port, operation, check)
+
+  local limit = self.checks[check].checks.unhealthy.tcp_failures
 
   -- TODO what do we do with the `operation` information
 
-  -- TODO what happens with mixed TCP and HTTP failures
-
-  return incr_counter(self, "unhealthy", ip, port)
+  return incr_counter(self, "unhealthy", ip, port, limit, CTR_TCP)
 
 end
 
 
-function checker:report_tcp_success(ip, port)
+function checker:report_tcp_success(ip, port, check)
 
-  return incr_counter(self, "healthy", ip, port)
+  local limit = self.checks[check].healthy.successes
+
+  return incr_counter(self, "healthy", ip, port, limit, CTR_TCP)
 
 end
 
 
-function checker:report_timeout(ip, port)
+function checker:report_timeout(ip, port, check)
 
-  -- TODO do we treat different kinds of failures differently?
+  local limit = self.checks[check].unhealthy.timeouts
 
-  return incr_counter(self, "unhealthy", ip, port)
+  return incr_counter(self, "unhealthy", ip, port, limit, CTR_TIMEOUT)
 
 end
 
@@ -556,14 +596,14 @@ function checker:run_single_check(ip, port, healthy)
     end
     if err == "timeout" then
       sock:close()  -- timeout errors do not close the socket.
-      return self:report_timeout(ip, port)
+      return self:report_timeout(ip, port, "active")
     end
-    return self:report_tcp_failure(ip, port, "connect")
+    return self:report_tcp_failure(ip, port, "connect", "active")
   end
 
   if self.type == "tcp" then
     sock:close()
-    return self:report_tcp_success()
+    return self:report_tcp_success(ip, port, "active")
   end
 
   -- TODO: implement https
@@ -574,9 +614,9 @@ function checker:run_single_check(ip, port, healthy)
     self:log(ERR, "failed to send http request to '", ip, ":", port, "': ", err)
     if err == "timeout" then
       sock:close()  -- timeout errors do not close the socket.
-      return self:report_timeout(ip, port)
+      return self:report_timeout(ip, port, "active")
     end
-    return self:report_tcp_failure(ip, port, "send")
+    return self:report_tcp_failure(ip, port, "send", "active")
   end
 
   local status_line
@@ -585,9 +625,9 @@ function checker:run_single_check(ip, port, healthy)
     self:log(ERR, "failed to receive status line from '", ip, ":", port, "': ", err)
     if err == "timeout" then
       sock:close()  -- timeout errors do not close the socket.
-      return self:report_timeout(ip, port)
+      return self:report_timeout(ip, port, "active")
     end
-    return self:report_tcp_failure(ip, port, "receive")
+    return self:report_tcp_failure(ip, port, "receive", "active")
   end
 
   local from, to = re_find(status_line,
@@ -603,7 +643,7 @@ function checker:run_single_check(ip, port, healthy)
 
   sock:close()
 
-  return self:report_http_status(ip, port, status)
+  return self:report_http_status(ip, port, status, "active")
 end
 
 -- executes a work package (a list of checks) sequentially
@@ -652,9 +692,8 @@ end
 -- failure they will call the health-management functions to deal with the
 -- results of the checks.
 
-local function make_checker_callback(mode, status)
+local function make_checker_callback(health_mode, status)
   local callback
-  local config = mode .. "_config"
   callback = function(premature, self)
     if premature or self.stop then
       self.timer_count = self.timer_count - 1
@@ -674,17 +713,18 @@ local function make_checker_callback(mode, status)
     end
 
     if not list_to_check[1] then
-      self:log(DEBUG, "checking ", mode, " targets: nothing to do")
+      self:log(DEBUG, "checking ", health_mode, " targets: nothing to do")
     else
-      self:log(DEBUG, "checking ", mode, " targets: #", #list_to_check)
+      self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
       self:active_check_targets(list_to_check)
     end
 
     -- reschedule timer
-    local ok, err = utils.gctimer(self[config].interval, callback, self)
+    local ok, err = utils.gctimer(self.checks.active[health_mode].interval,
+                                  callback, self)
     if not ok then
       self.timer_count = self.timer_count - 1
-      self:log(ERR, "failed to re-create '", mode, "' timer: ", err)
+      self:log(ERR, "failed to re-create '", health_mode, "' timer: ", err)
       return
     end
   end
@@ -804,34 +844,70 @@ end
 -- Create health-checkers
 --============================================================================
 
---[[
-  {
-      name = "some unique name"                                  -- needed as key in shm
-      shm_name = "healthcheck"                                   -- hidden in worker-events??
-      type = "http"                                              -- http, https, tcp
-      http_request = "GET /status HTTP/1.0\r\nHost: foo.com\r\n\r\n"  -- raw request?
-      timeout = 1000,                                            -- 1 sec is the timeout for network operations
-      unhealthy_config = {
-        interval = 500,                                          -- run the check cycle every 0.5 sec on healthy nodes
-        occurrences = 4,                                         -- successive failures for marking a peer unhealthy
-        statuses = {429},                                        -- a list of HTTP status codes to make it fail
-      }
-      healthy_config = {
-        interval = 2000,                                         -- run the check cycle every 2 sec on healthy nodes
-        occurrences = 4,                                         -- successive failures for marking a peer healthy
-        statuses = {200, 302},                                   -- a list of HTTP status codes to make it succeed
-      }
-      concurrency = 10,  -- concurrency level for test requests
-  })
---]]
+
+local NO_DEFAULT = {}
 
 
-local function to_set(list)
+local function fill_in_settings(opts, defaults)
+  local obj = {}
+  for k, default in pairs(defaults) do
+    local v = opts[k] or default
+    if type(v) == "table" then
+      obj[k] = v ~= NO_DEFAULT and fill_in_settings(v, default)
+    else
+      obj[k] = v
+    end
+  end
+  return obj
+end
+
+
+local defaults = {
+  name = NO_DEFAULT,
+  shm_name = NO_DEFAULT,
+  type = "http",
+  timeout = 1000, -- TODO determine suitable default
+  concurrency = 10,
+  checks = {
+    active = {
+      http_request = nil,
+      healthy = {
+        interval = 1000, -- TODO determine suitable default
+        http_statuses = { 200, 302 },
+        successes = 5, -- TODO determine suitable default
+      },
+      unhealthy = {
+        interval = 500, -- TODO determine suitable default
+        http_statuses = { 429, 404,
+                          500, 501, 502, 503, 504, 505 }, -- ...more?
+        tcp_failures = 2, -- TODO determine suitable default
+        timeouts = 7, -- TODO determine suitable default
+        http_errors = 5, -- TODO determine suitable default
+      },
+    },
+    passive = {
+      healthy = {
+        http_statuses = { 200, 201, 202, 203, 204, 205, 206, 207, 208, 226,
+                          300, 301, 302, 303, 304, 305, 306, 307, 308 },
+        successes = 5, -- TODO determine suitable default
+      },
+      unhealthy = {
+        http_statuses = { 429, 503 },
+        tcp_failures = 2, -- TODO determine suitable default
+        timeouts = 7, -- TODO determine suitable default
+        http_errors = 5, -- TODO determine suitable default
+      },
+    },
+  },
+}
+
+
+local function to_set(tbl, key)
   local set = {}
-  for _, item in ipairs(list) do
+  for _, item in ipairs(tbl[key]) do
     set[item] = true
   end
-  return set
+  tbl[key] = set
 end
 
 
@@ -840,53 +916,24 @@ end
 -- @return checker object, or nil + error
 function _M.new(opts)
 
-  local self = {
+  local self = fill_in_settings(opts, defaults)
 
-    -- options defaults
-
-    -- some unique name, needed as key in shm
-    name = opts.name or "checker_" .. tostring(math.random(1, 1000000000)),
-    -- http, https, tcp
-    type = get_healthcheck_type_set(opts.type),
-    -- raw http request
-    http_request = opts.http_request,
-    -- how many concurrent requests while probing
-    concurrency = opts.concurrency or 10,
-    -- network timeout for probes
-    timeout = opts.timeout or 1000,
-    unhealthy_config = {
-      -- interval between healthchecks of unhealthy nodes
-      interval = (opts.unhealthy_config or EMPTY)["interval"] or 500,
-      -- successive failures for marking a peer unhealthy
-      occurrences = (opts.unhealthy_config or EMPTY)["occurrences"] or 4, -- TODO determine suitable defaults
-      -- a list of HTTP status codes to make it fail
-      statuses = (opts.unhealthy_config or EMPTY)["status"] or {429},     -- TODO determine suitable defaults
-    },
-    healthy_config = {
-      -- interval between healthchecks of healthy nodes
-      interval = (opts.unhealthy_config or EMPTY)["interval"] or 2000,
-      -- successive failures for marking a peer healthy
-      occurrences = (opts.healthy_config or EMPTY)["occurrences"] or 4,   -- TODO determine suitable defaults
-      -- a list of HTTP status codes to make it succeed
-      statuses = (opts.healthy_config or EMPTY)["status"] or {200, 302},  -- TODO determine suitable defaults
-    },
-
-    -- other properties
-
-    targets = nil,   -- list of targets, initially loaded, maintained by events
-    events = nil,    -- hash table with supported events (prevent magic strings)
-    stop = true,     -- flag to idicate to timers to stop checking
-    timer_count = 0, -- number of running timers
-    shm = nil,       -- the shm to use (actual shm, not its name)
-  }
-
-  -- Convert status lists to sets
-  self.unhealthy_config.statuses = to_set(self.unhealthy_config.statuses)
-  self.healthy_config.statuses = to_set(self.healthy_config.statuses)
-
-  assert(opts.shm_name, "required option 'shm_name' is missing")
+  assert(self.shm_name, "required option 'shm_name' is missing")
   self.shm = ngx.shared[tostring(opts.shm_name)]
   assert(self.shm, ("no shm found by name '%s'"):format(opts.shm_name))
+
+  -- other properties
+  self.targets = nil   -- list of targets, initially loaded, maintained by events
+  self.events = nil    -- hash table with supported events (prevent magic strings)
+  self.stop = true     -- flag to idicate to timers to stop checking
+  self.timer_count = 0 -- number of running timers
+  self.shm = nil       -- the shm to use (actual shm, not its name)
+
+  -- Convert status lists to sets
+  to_set(self.active_checks.unhealthy, "http_statuses")
+  to_set(self.active_checks.healthy, "http_statuses")
+  to_set(self.passive_checks.unhealthy, "http_statuses")
+  to_set(self.passive_checks.healthy, "http_statuses")
 
   -- decorate with methods and constants
   self.events = EVENTS
