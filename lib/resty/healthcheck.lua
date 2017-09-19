@@ -1,25 +1,19 @@
 local ERR = ngx.ERR
-local INFO = ngx.INFO
 local WARN = ngx.WARN
 local DEBUG = ngx.DEBUG
 local ngx_log = ngx.log
-local new_timer = ngx.timer.at
-local debug_mode = ngx.config.debug
 local tostring = tostring
 local ipairs = ipairs
-local pcall = pcall
 local cjson = require("cjson.safe").new()
-local get_pid = ngx.worker.pid
-local now = ngx.now
-local sleep = ngx.sleep
-local table_insert = table.insert
 local table_remove = table.remove
 local utils = require("resty.healthcheck.utils")
+local worker_events = require("resty.worker.events")
 local resty_lock = require ("resty.lock")
 local re_find = ngx.re.find
 local bit = require("bit")
 
 -- constants
+local EVENT_SOURCE_PREFIX = "lua-resty-healthcheck"
 local LOG_PREFIX = "[healthcheck] "
 local SHM_PREFIX = "lua-resty-healthcheck:"
 local EMPTY = setmetatable({},{
@@ -27,12 +21,6 @@ local EMPTY = setmetatable({},{
       error("the EMPTY table is read only, check your code!", 2)
     end
   })
-
--- defaults
-local DEFAULT_TIMEOUT = 2
-local DEFAULT_INTERVAL = 1
-local DEFAULT_WAIT_MAX = 0.5
-local DEFAULT_WAIT_INTERVAL = 0.010
 
 
 -- Counters: a 32-bit shm integer can hold up to four 8-bit counters.
@@ -48,14 +36,13 @@ local EVENTS = setmetatable({}, {
   end
 })
 for _, event in ipairs({
-  -- "add", -- no 'add' because adding will result in `(un)healthy` events
+  -- "add", -- no 'add'because adding will result in `(un)healthy` events
   "remove",
   "healthy",
   "unhealthy",
 }) do
   EVENTS[event] = event
 end
-
 
 local _M = {}
 
@@ -797,9 +784,7 @@ end
 
 -- Raises an event for a target status change.
 function checker:raise_event(event_name, ip, port)
-
-  -- TODO implement, depends on event lib
-
+  worker_events.post(self.EVENT_SOURCE, event_name, { ip = ip, port = port })
 end
 
 
@@ -807,7 +792,8 @@ end
 -- @return true
 function checker:stop()
   self.stop = true
-  --TODO: unregister event handler, to be eligible for GC
+  -- unregister event handler, to be eligible for GC
+  worker_events.unregister(self.ev_callback, self.EVENT_SOURCE)
   return true
 end
 
@@ -832,7 +818,8 @@ function checker:start()
   end
   self.timer_count = self.timer_count + 1
 
-  --TODO: unregister and re-register event handler
+  worker_events.unregister(self.ev_callback, self.EVENT_SOURCE)  -- ensure we never double subscribe
+  worker_events.register(self.ev_callback, self.EVENT_SOURCE)
 
   self.stop = false  -- do this at the end, so if either creation fails, the other stops also
   return true
@@ -916,6 +903,9 @@ end
 -- @return checker object, or nil + error
 function _M.new(opts)
 
+  assert(worker_events.configured(), "please configure the " ..
+      "'lua-resty-worker-events' module before using 'lua-resty-healthcheck'")
+
   local self = fill_in_settings(opts, defaults)
 
   assert(self.shm_name, "required option 'shm_name' is missing")
@@ -923,11 +913,12 @@ function _M.new(opts)
   assert(self.shm, ("no shm found by name '%s'"):format(opts.shm_name))
 
   -- other properties
-  self.targets = nil   -- list of targets, initially loaded, maintained by events
-  self.events = nil    -- hash table with supported events (prevent magic strings)
-  self.stop = true     -- flag to idicate to timers to stop checking
-  self.timer_count = 0 -- number of running timers
-  self.shm = nil       -- the shm to use (actual shm, not its name)
+  self.targets = nil     -- list of targets, initially loaded, maintained by events
+  self.events = nil      -- hash table with supported events (prevent magic strings)
+  self.stop = true       -- flag to idicate to timers to stop checking
+  self.timer_count = 0   -- number of running timers
+  self.shm = nil         -- the shm to use (actual shm, not its name)
+  self.ev_callback = nil -- callback closure per checker instance
 
   -- Convert status lists to sets
   to_set(self.active_checks.unhealthy, "http_statuses")
@@ -941,24 +932,24 @@ function _M.new(opts)
     self[k] = v
   end
 
-  -- prepare shm keys
+  -- prepare shm keys/constants
   self.TARGET_STATUS    = SHM_PREFIX .. self.name .. ":status"
   self.TARGET_OKS       = SHM_PREFIX .. self.name .. ":oks"
   self.TARGET_NOKS      = SHM_PREFIX .. self.name .. ":noks"
   self.TARGET_LIST      = SHM_PREFIX .. self.name .. ":target_list"
   self.TARGET_LIST_LOCK = SHM_PREFIX .. self.name .. ":target_list_lock"
+  self.EVENT_SOURCE     = EVENT_SOURCE_PREFIX .. " [" .. self.name .. "]"
 
   -- register for events, and directly after load initial target list
   -- order is important!
-  -- TODO: implementation depends on the actual event library used
-  event_lib.register(
-    function(...)
-      -- just a wrapper to be able to access `self` as a closure
-      return self:event_handler(event_name, ip, port)
-    end
-  )
-  -- Now load the initial list of targets
   do
+    self.ev_callback = function(data, event)
+      -- just a wrapper to be able to access `self` as a closure
+      return self:event_handler(event, data.ip, data.port)
+    end
+    worker_events.register(self.ev_callback, self.EVENT_SOURCE)
+
+    -- Now load the initial list of targets
     -- all atomic accesses, so we do not need a lock
     local err
     self.targets, err = fetch_target_list(self)
@@ -974,12 +965,15 @@ function _M.new(opts)
       self.targets[target.ip] = self.targets[target.ip] or {}
       self.targets[target.ip][target.port] = target
     end
+    
+    -- handle events to sync up in case there was a change by another worker
+    worker_events:poll()
   end
 
   -- start timers
   local ok, err = self:start()
   if not ok then
-    --TODO: unregister event handler, to be eligible for GC
+    self:stop()
     return nil, err
   end
 
