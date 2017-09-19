@@ -25,9 +25,10 @@ local EMPTY = setmetatable({},{
 
 -- Counters: a 32-bit shm integer can hold up to four 8-bit counters.
 -- Here, we are using three.
-local CTR_HTTP    = 0x000000
+local CTR_HTTP    = 0x000000   -- TODO: 0x01 maybe?
 local CTR_TCP     = 0x000100
 local CTR_TIMEOUT = 0x010000
+local CTR_SUCCESS = CTR_HTTP   -- same, but stored in separate shm value
 
 
 local EVENTS = setmetatable({}, {
@@ -407,6 +408,8 @@ end
 -- the healthy state; "unhealthy" for the failure counter.
 -- @param ip Target IP
 -- @param port Target port
+-- @param limit the limit after which target status is changed
+-- @param ctr_type the counter to increment, see CTR_xxx constants
 -- @return True if succeeded, or nil and an error message.
 local function incr_counter(self, health_mode, ip, port, limit, ctr_type)
 
@@ -461,15 +464,23 @@ end
 
 --- Report a health failure.
 -- Reports a health failure which will count against the number of occurrences
--- required to make a target "fall" or "rise".
+-- required to make a target "fall". The type of healthchecker,
+-- "tcp" or "http" determines against which counter the occurence goes.
 -- @param ip ip-address of the target being checked
 -- @param port the port being checked against
+-- @param check (optional) the type of check, either "passive" or "active", default "passive"
 -- @return `true` on success, or nil+error on failure
-function checker:report_failure(ip, port)
+function checker:report_failure(ip, port, check)
 
-  -- TODO what does an unspecified failure mean
-  local limit = 0 -- FIXME which limit goes here
-  local ctr_type = CTR_HTTP -- FIXME which type goes here
+  local checks = self.checks[check or "passive"]
+  local limit, ctr_type
+  if self.type == "tcp" then
+    limit = checks.unhealthy.tcp_failures
+    ctr_type = CTR_TCP
+  else
+    limit = checks.unhealthy.http_errors
+    ctr_type = CTR_HTTP
+  end
   
   return incr_counter(self, "unhealthy", ip, port, limit, ctr_type)
 
@@ -478,17 +489,16 @@ end
 
 --- Report a health success.
 -- Reports a health success which will count against the number of occurrences
--- required to make a target "fall" or "rise".
+-- required to make a target "rise".
 -- @param ip ip-address of the target being checked
 -- @param port the port being checked against
+-- @param check (optional) the type of check, either "passive" or "active", default "passive"
 -- @return `true` on success, or nil+error on failure
-function checker:report_success(ip, port)
+function checker:report_success(ip, port, check)
 
-  -- TODO what does an unspecified success mean
-  local limit = 0 -- FIXME which limit goes here
-  local ctr_type = CTR_HTTP -- FIXME which type goes here
+  local limit = self.checks[check or "passive"].healthy.successes
 
-  return incr_counter(self, "healthy", ip, port, limit, ctr_type)
+  return incr_counter(self, "healthy", ip, port, limit, CTR_SUCCESS)
 
 end
 
@@ -499,19 +509,19 @@ end
 -- @param ip ip-address of the target being checked
 -- @param port the port being checked against
 -- @param http_status the http statuscode, or nil to report an invalid http response
+-- @param check (optional) the type of check, either "passive" or "active", default "passive"
 -- @return `true` on success, or nil+error on failure
 function checker:report_http_status(ip, port, http_status, check)
   http_status = tonumber(http_status) or 0
 
-  local checks = self.checks[check]
+  local checks = self.checks[check or "passive"]
 
   local status_type, limit
   if checks.healthy.http_statuses[http_status] then
     status_type = "healthy"
     limit = checks.healthy.successes
-  elseif (not http_status)
-         or checks.unhealthy.http_statuses[http_status]
-         or http_status == 0 then
+  elseif checks.unhealthy.http_statuses[http_status]
+      or http_status == 0 then
     status_type = "unhealthy"
     limit = checks.unhealthy.http_errors
   else
@@ -522,7 +532,7 @@ function checker:report_http_status(ip, port, http_status, check)
 
 end
 
-
+--- Report a failure on TCP level
 -- @param ip ip-address of the target being checked
 -- @param port the port being checked against
 -- @param operation The socket operation that failed:
@@ -530,9 +540,10 @@ end
 -- TODO check what kind of information we get from the OpenResty layer
 -- in order to tell these error conditions apart
 -- https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/balancer.md#get_last_failure
+-- @param check (optional) the type of check, either "passive" or "active", default "passive"
 function checker:report_tcp_failure(ip, port, operation, check)
 
-  local limit = self.checks[check].checks.unhealthy.tcp_failures
+  local limit = self.checks[check or "passive"].checks.unhealthy.tcp_failures
 
   -- TODO what do we do with the `operation` information
 
@@ -540,7 +551,8 @@ function checker:report_tcp_failure(ip, port, operation, check)
 
 end
 
-
+--[[
+-- remove this? there is only one type of success?
 function checker:report_tcp_success(ip, port, check)
 
   local limit = self.checks[check].healthy.successes
@@ -548,11 +560,15 @@ function checker:report_tcp_success(ip, port, check)
   return incr_counter(self, "healthy", ip, port, limit, CTR_TCP)
 
 end
+--]]
 
-
+--- Report a timeout failure.
+-- @param ip ip-address of the target being checked
+-- @param port the port being checked against
+-- @param check (optional) the type of check, either "passive" or "active", default "passive"
 function checker:report_timeout(ip, port, check)
 
-  local limit = self.checks[check].unhealthy.timeouts
+  local limit = self.checks[check or "passive"].unhealthy.timeouts
 
   return incr_counter(self, "unhealthy", ip, port, limit, CTR_TIMEOUT)
 
@@ -778,7 +794,7 @@ end
 -- Log a message specific to this checker
 -- @param level standard ngx log level constant
 function checker:log(level, ...)
-  ngx_log(level, LOG_PREFIX, "(", self.name, ") ", ...)
+  ngx_log(level, self.LOG_PREFIX, ...)
 end
 
 
@@ -932,13 +948,15 @@ function _M.new(opts)
     self[k] = v
   end
 
-  -- prepare shm keys/constants
+  -- prepare shm keys
   self.TARGET_STATUS    = SHM_PREFIX .. self.name .. ":status"
   self.TARGET_OKS       = SHM_PREFIX .. self.name .. ":oks"
   self.TARGET_NOKS      = SHM_PREFIX .. self.name .. ":noks"
   self.TARGET_LIST      = SHM_PREFIX .. self.name .. ":target_list"
   self.TARGET_LIST_LOCK = SHM_PREFIX .. self.name .. ":target_list_lock"
+  -- prepare constants
   self.EVENT_SOURCE     = EVENT_SOURCE_PREFIX .. " [" .. self.name .. "]"
+  self.LOG_PREFIX       = LOG_PREFIX .. "(" .. self.name .. ") "
 
   -- register for events, and directly after load initial target list
   -- order is important!
