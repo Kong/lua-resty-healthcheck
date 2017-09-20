@@ -1,3 +1,10 @@
+--------------------------------------------------------------------------
+-- Healthcheck library for OpenResty.
+--
+-- @copyright 2017 Kong Inc.
+-- @author Hisham Muhammad, Thijs Schreijer
+-- @license Apache 2.0
+
 local ERR = ngx.ERR
 local WARN = ngx.WARN
 local DEBUG = ngx.DEBUG
@@ -131,7 +138,7 @@ local checker = {}
 --============================================================================
 
 
--- @return the atregt list from the shm, an empty table if not found, or
+-- @return the target list from the shm, an empty table if not found, or
 -- nil+error upon a failure
 local function fetch_target_list(self)
   local target_list, err = self.shm:get(self.TARGET_LIST)
@@ -188,8 +195,7 @@ end
 
 --- Add a target to the healthchecker.
 -- @param ip ip-address of the target to check
--- @param port the port to check against, will be ignored when `ip` already
--- includes a port number
+-- @param port the port to check against
 -- @param healthy (optional) a boolean value indicating the initial state,
 -- default is true
 -- @return true on success, nil+err on failure
@@ -293,19 +299,19 @@ end
 -- Status management
 --============================================================================
 
---[[ (not for the first iteration)
 --- Gets the current status of the target
 -- @param ip ip-address of the target being checked
 -- @param port the port being checked against
 -- @return `true` if healthy, `false` if unhealthy, or nil+error on failure
 function checker:get_target_status(ip, port)
 
-  -- TODO: implement
-  -- needs to lock the same data that report_* functions lock
-  -- alternative is to keep a cache and return potentially outdated data
+  local target = (self.targets[ip] or EMPTY)[port]
+  if not target then
+    return nil, "target not found"
+  end
+  return target.healthy
 
 end
-]]
 
 --[[ (not for the first iteration)
 --- Sets the current status of the target.
@@ -404,8 +410,8 @@ end
 -- is reached, it changes the status of the target in the shm and posts an
 -- event.
 -- @param self The checker object
--- @param mode "healthy" for the success counter that drives a target towards
--- the healthy state; "unhealthy" for the failure counter.
+-- @param health_mode "healthy" for the success counter that drives a target
+-- towards the healthy state; "unhealthy" for the failure counter.
 -- @param ip Target IP
 -- @param port Target port
 -- @param limit the limit after which target status is changed
@@ -551,16 +557,6 @@ function checker:report_tcp_failure(ip, port, operation, check)
 
 end
 
---[[
--- remove this? there is only one type of success?
-function checker:report_tcp_success(ip, port, check)
-
-  local limit = self.checks[check].healthy.successes
-
-  return incr_counter(self, "healthy", ip, port, limit, CTR_TCP)
-
-end
---]]
 
 --- Report a timeout failure.
 -- @param ip ip-address of the target being checked
@@ -950,6 +946,7 @@ end
 
 
 --- Creates a new health-checker instance.
+-- It will be started upon creation.
 -- @param opts table with checker options
 -- @return checker object, or nil + error
 function _M.new(opts)

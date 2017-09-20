@@ -1,0 +1,10 @@
+project='lua-resty-healthcheck'
+title='Healthcheck library for OpenResty'
+description='Provides active and passive healthchecks (http and tcp) for OpenResty'
+format='discount'
+file='./lib/'
+dir='docs'
+readme='readme.md'
+sort=true
+sort_modules=true
+all=false

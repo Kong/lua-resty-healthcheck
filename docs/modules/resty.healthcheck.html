@@ -1,0 +1,447 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>Healthcheck library for OpenResty</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>lua-resty-healthcheck</h1>
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><strong>resty.healthcheck</strong></li>
+  <li><a href="../modules/resty.healthcheck.utils.html">resty.healthcheck.utils</a></li>
+</ul>
+<h2>Topics</h2>
+<ul class="">
+  <li><a href="../topics/readme.md.html">readme</a></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>resty.healthcheck</code></h1>
+<p>Healthcheck library for OpenResty.</p>
+<p>
+
+</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Copyright</strong>: 2017 Kong Inc.</li>
+        <li><strong>License</strong>: Apache 2.0</li>
+        <li><strong>Author</strong>: Hisham Muhammad, Thijs Schreijer</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#checker:add_target">checker:add_target (ip, port, healthy)</a></td>
+	<td class="summary">Add a target to the healthchecker.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#checker:get_target_status">checker:get_target_status (ip, port)</a></td>
+	<td class="summary">Gets the current status of the target</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#checker:remove_target">checker:remove_target (ip, port)</a></td>
+	<td class="summary">Remove a target from the healthchecker.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#checker:report_failure">checker:report_failure (ip, port, check)</a></td>
+	<td class="summary">Report a health failure.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#checker:report_http_status">checker:report_http_status (ip, port, http_status, check)</a></td>
+	<td class="summary">Report a http response code.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#checker:report_success">checker:report_success (ip, port, check)</a></td>
+	<td class="summary">Report a health success.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#checker:report_tcp_failure">checker:report_tcp_failure (ip, port, operation, check)</a></td>
+	<td class="summary">Report a failure on TCP level</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#checker:report_timeout">checker:report_timeout (ip, port, check)</a></td>
+	<td class="summary">Report a timeout failure.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#checker:start">checker:start ()</a></td>
+	<td class="summary">Starts the background health checks.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#checker:stop">checker:stop ()</a></td>
+	<td class="summary">Stop the background health checks.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#new">new (opts)</a></td>
+	<td class="summary">Creates a new health-checker instance.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "checker:add_target"></a>
+    <strong>checker:add_target (ip, port, healthy)</strong>
+    </dt>
+    <dd>
+    Add a target to the healthchecker.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">ip</span>
+         ip-address of the target to check
+        </li>
+        <li><span class="parameter">port</span>
+         the port to check against, will be ignored when <code>ip</code> already
+ includes a port number
+        </li>
+        <li><span class="parameter">healthy</span>
+         (optional) a boolean value indicating the initial state,
+ default is true
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        true on success, nil+err on failure
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "checker:get_target_status"></a>
+    <strong>checker:get_target_status (ip, port)</strong>
+    </dt>
+    <dd>
+    Gets the current status of the target
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">ip</span>
+         ip-address of the target being checked
+        </li>
+        <li><span class="parameter">port</span>
+         the port being checked against
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        <code>true</code> if healthy, <code>false</code> if unhealthy, or nil+error on failure
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "checker:remove_target"></a>
+    <strong>checker:remove_target (ip, port)</strong>
+    </dt>
+    <dd>
+    Remove a target from the healthchecker.
+ The target not existing is not considered an error.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">ip</span>
+         ip-address of the target being checked
+        </li>
+        <li><span class="parameter">port</span>
+         the port being checked against
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        true on success, nil+err on failure
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "checker:report_failure"></a>
+    <strong>checker:report_failure (ip, port, check)</strong>
+    </dt>
+    <dd>
+    Report a health failure.
+ Reports a health failure which will count against the number of occurrences
+ required to make a target "fall". The type of healthchecker,
+ "tcp" or "http" determines against which counter the occurence goes.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">ip</span>
+         ip-address of the target being checked
+        </li>
+        <li><span class="parameter">port</span>
+         the port being checked against
+        </li>
+        <li><span class="parameter">check</span>
+         (optional) the type of check, either "passive" or "active", default "passive"
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        <code>true</code> on success, or nil+error on failure
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "checker:report_http_status"></a>
+    <strong>checker:report_http_status (ip, port, http_status, check)</strong>
+    </dt>
+    <dd>
+    Report a http response code.
+ How the code is interpreted is based on the configuration for healthy and
+ unhealthy statuses. If it is in neither strategy, it will be ignored.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">ip</span>
+         ip-address of the target being checked
+        </li>
+        <li><span class="parameter">port</span>
+         the port being checked against
+        </li>
+        <li><span class="parameter">http_status</span>
+         the http statuscode, or nil to report an invalid http response
+        </li>
+        <li><span class="parameter">check</span>
+         (optional) the type of check, either "passive" or "active", default "passive"
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        <code>true</code> on success, or nil+error on failure
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "checker:report_success"></a>
+    <strong>checker:report_success (ip, port, check)</strong>
+    </dt>
+    <dd>
+    Report a health success.
+ Reports a health success which will count against the number of occurrences
+ required to make a target "rise".
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">ip</span>
+         ip-address of the target being checked
+        </li>
+        <li><span class="parameter">port</span>
+         the port being checked against
+        </li>
+        <li><span class="parameter">check</span>
+         (optional) the type of check, either "passive" or "active", default "passive"
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        <code>true</code> on success, or nil+error on failure
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "checker:report_tcp_failure"></a>
+    <strong>checker:report_tcp_failure (ip, port, operation, check)</strong>
+    </dt>
+    <dd>
+    Report a failure on TCP level
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">ip</span>
+         ip-address of the target being checked
+        </li>
+        <li><span class="parameter">port</span>
+         the port being checked against
+        </li>
+        <li><span class="parameter">operation</span>
+         The socket operation that failed:
+ "connect", "send" or "receive".
+ TODO check what kind of information we get from the OpenResty layer
+ in order to tell these error conditions apart
+ https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/balancer.md#get<em>last</em>failure
+        </li>
+        <li><span class="parameter">check</span>
+         (optional) the type of check, either "passive" or "active", default "passive"
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "checker:report_timeout"></a>
+    <strong>checker:report_timeout (ip, port, check)</strong>
+    </dt>
+    <dd>
+    Report a timeout failure.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">ip</span>
+         ip-address of the target being checked
+        </li>
+        <li><span class="parameter">port</span>
+         the port being checked against
+        </li>
+        <li><span class="parameter">check</span>
+         (optional) the type of check, either "passive" or "active", default "passive"
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "checker:start"></a>
+    <strong>checker:start ()</strong>
+    </dt>
+    <dd>
+    Starts the background health checks.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        true or nil+error
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "checker:stop"></a>
+    <strong>checker:stop ()</strong>
+    </dt>
+    <dd>
+    Stop the background health checks.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        true
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "new"></a>
+    <strong>new (opts)</strong>
+    </dt>
+    <dd>
+    Creates a new health-checker instance.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">opts</span>
+         table with checker options
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        checker object, or nil + error
+    </ol>
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.6</a></i>
+<i style="float:right;">Last updated 2017-09-20 14:05:35 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

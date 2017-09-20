@@ -1,4 +1,10 @@
--- code originally from https://github.com/Mashape/lua-resty-dns-client
+--------------------------------------------------------------------------
+-- Utilities used by the healthcheck library.
+--
+-- Code originally from https://github.com/Mashape/lua-resty-dns-client
+-- @copyright 2017 Kong Inc.
+-- @author Hisham Muhammad, Thijs Schreijer
+-- @license Apache 2.0
 
 local timer_at = ngx.timer.at
 local gsub = string.gsub
@@ -18,6 +24,15 @@ local timer_callback = function(premature, cb, id, ...)
   return cb(premature, self, ...)
 end
 
+--- A garbage-collectible timer implementation.
+-- Provides a timer that can be attached to an object, and GC'ed along
+-- with that object, as opposed to regular timers that keep running and
+-- prevent the object from being GC'ed.
+-- @param t time in ms
+-- @param cb callback for the timer. The signature is `function(premature, self, ...)`
+-- @param self the object the timer belongs to
+-- @param ... any additional parameters to pass to the timer callback
+-- @return timer handle (same as `ngx.timer.at`)
 _M.gctimer = function(t, cb, self, ...)
   assert(type(cb) == "function", "expected arg #2 to be a function")
   assert(type(self) == "table", "expected arg #3 to be a table")
