@@ -18,6 +18,7 @@ local worker_events = require("resty.worker.events")
 local resty_lock = require ("resty.lock")
 local re_find = ngx.re.find
 local bit = require("bit")
+local ngx_now = ngx.now
 
 -- constants
 local EVENT_SOURCE_PREFIX = "lua-resty-healthcheck"
@@ -700,9 +701,10 @@ function checker:get_periodic_lock(health_mode)
   local key = self.PERIODIC_LOCK .. health_mode
   local interval = self.checks.active[health_mode].interval
 
-  -- the lock is held for the whole interval to prevent multiple
+  -- The lock is held for the whole interval to prevent multiple
   -- worker processes from sending the test request simultaneously.
-  -- here we substract the lock expiration time by 1ms to prevent
+  -- UNLESS: the probing takes longer than the timer interval.
+  -- Here we substract the lock expiration time by 1ms to prevent
   -- a race condition with the next timer event.
   local ok, err = self.shm:add(key, true, interval - 0.001)
   if not ok then
@@ -725,37 +727,41 @@ local function make_checker_callback(health_mode)
       self.timer_count = self.timer_count - 1
       return
     end
-    
-    -- get the periodic lock to prevent multiple workers from
-    -- running the check simultaneously
+
+    local interval
     if not self:get_periodic_lock(health_mode) then
       -- another worker just ran, or is running the healthcheck
-      return
-    end
+      interval = self.checks.active[health_mode].interval
 
-    -- create a list of targets to check, here we can still do this atomically
-    local list_to_check = {}
-    local status = (health_mode == "healthy")
-    for _, target in ipairs(self.targets) do
-      if target.healthy == status then
-        list_to_check[#list_to_check + 1] = {
-          ip = target.ip,
-          port = target.port,
-          healthy = target.healthy,
-        }
-      end
-    end
-
-    if not list_to_check[1] then
-      self:log(DEBUG, "checking ", health_mode, " targets: nothing to do")
     else
-      self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
-      self:active_check_targets(list_to_check)
+      -- we're elected to run the active healthchecks
+      -- create a list of targets to check, here we can still do this atomically
+      local start_time = ngx_now()
+      local list_to_check = {}
+      local status = (health_mode == "healthy")
+      for _, target in ipairs(self.targets) do
+        if target.healthy == status then
+          list_to_check[#list_to_check + 1] = {
+            ip = target.ip,
+            port = target.port,
+            healthy = target.healthy,
+          }
+        end
+      end
+
+      if not list_to_check[1] then
+        self:log(DEBUG, "checking ", health_mode, " targets: nothing to do")
+      else
+        self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
+        self:active_check_targets(list_to_check)
+      end
+
+      local run_time = ngx_now() - start_time
+      interval = math.max(0, self.checks.active[health_mode].interval - run_time)
     end
 
     -- reschedule timer
-    local ok, err = utils.gctimer(self.checks.active[health_mode].interval,
-                                  callback, self)
+    local ok, err = utils.gctimer(interval, callback, self)
     if not ok then
       self.timer_count = self.timer_count - 1
       self:log(ERR, "failed to re-create '", health_mode, "' timer: ", err)
