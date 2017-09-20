@@ -853,17 +853,21 @@ function checker:start()
   end
 
   local ok, err
-  ok, err = ngx.timer.at(0, self.healthy_callback, self)
-  if not ok then
-    return nil, "failed to create 'healthy' timer: " .. err
+  if self.checks.active.healthy.interval > 0 then
+    ok, err = ngx.timer.at(0, self.healthy_callback, self)
+    if not ok then
+      return nil, "failed to create 'healthy' timer: " .. err
+    end
+    self.timer_count = self.timer_count + 1
   end
-  self.timer_count = self.timer_count + 1
 
-  ok, err = ngx.timer.at(0, self.unhealthy_callback, self)
-  if not ok then
-    return nil, "failed to create 'unhealthy' timer: " .. err
+  if self.checks.active.unhealthy.interval > 0 then
+    ok, err = ngx.timer.at(0, self.unhealthy_callback, self)
+    if not ok then
+      return nil, "failed to create 'unhealthy' timer: " .. err
+    end
+    self.timer_count = self.timer_count + 1
   end
-  self.timer_count = self.timer_count + 1
 
   worker_events.unregister(self.ev_callback, self.EVENT_SOURCE)  -- ensure we never double subscribe
   worker_events.register(self.ev_callback, self.EVENT_SOURCE)
@@ -906,12 +910,12 @@ local defaults = {
     active = {
       http_request = nil,
       healthy = {
-        interval = 1000, -- TODO determine suitable default
+        interval = 1000, -- 0 == no timer, TODO determine suitable default
         http_statuses = { 200, 302 },
         successes = 5, -- TODO determine suitable default
       },
       unhealthy = {
-        interval = 500, -- TODO determine suitable default
+        interval = 500, -- 0 == no timer, TODO determine suitable default
         http_statuses = { 429, 404,
                           500, 501, 502, 503, 504, 505 }, -- ...more?
         tcp_failures = 2, -- TODO determine suitable default
