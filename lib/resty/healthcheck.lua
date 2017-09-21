@@ -957,7 +957,27 @@ end
 
 --- Creates a new health-checker instance.
 -- It will be started upon creation.
--- @param opts table with checker options
+-- @param opts table with checker options. Options are:
+-- * `name`: name of the health checker
+-- * `shm_name`: the shm to use (actual shm, not its name)
+-- * `type`: "http", "https" or "tcp"
+-- * `checks.active.timeout`: socket timeout for active checks
+-- * `checks.active.concurrency`: number of targets to check concurrently
+-- * `checks.active.http_request`: string of a complete HTTP request to run on active checks
+-- * `checks.active.healthy.interval`: interval between checks for healthy targets
+-- * `checks.active.healthy.http_statuses`: which HTTP statuses to consider a success
+-- * `checks.active.healthy.successes`: number of successes to consider a target healthy
+-- * `checks.active.unhealthy.interval`: interval between checks for unhealthy targets
+-- * `checks.active.unhealthy.http_statuses`: which HTTP statuses to consider a failure
+-- * `checks.active.unhealthy.tcp_failures`: number of TCP failures to consider a target unhealthy
+-- * `checks.active.unhealthy.timeouts`: number of HTTP errors to consider a target unhealthy
+-- * `checks.active.unhealthy.http_errors`: number of HTTP errors to consider a target unhealthy
+-- * `checks.passive.healthy.http_statuses`: which HTTP statuses to consider a failure
+-- * `checks.passive.healthy.successes`: number of successes to consider a target healthy
+-- * `checks.passive.unhealthy.http_statuses`: which HTTP statuses to consider a success
+-- * `checks.passive.unhealthy.tcp_failures`: number of TCP failures to consider a target unhealthy
+-- * `checks.passive.unhealthy.timeouts`: number of HTTP errors to consider a target unhealthy
+-- * `checks.passive.unhealthy.http_errors`: number of HTTP errors to consider a target unhealthy
 -- @return checker object, or nil + error
 function _M.new(opts)
 
