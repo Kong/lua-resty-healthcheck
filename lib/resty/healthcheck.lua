@@ -160,7 +160,7 @@ end
 -- in case it fails locking.
 local function locking_target_list(self, fn)
 
-  local lock, lock_err = resty_lock.new(self.shm, {
+  local lock, lock_err = resty_lock:new(self.shm_name, {
                   exptime = 10,  -- timeout after which lock is released anyway
                   timeout = 5,   -- max wait time to acquire lock
                 })
@@ -186,7 +186,7 @@ local function locking_target_list(self, fn)
   ok, err = lock:unlock()
   if not ok then
     -- recoverable: not returning this error, only logging it
-    self.log(ERR, "failed to release lock '", self.TARGET_LIST_LOCK,
+    self:log(ERR, "failed to release lock '", self.TARGET_LIST_LOCK,
                   "': ", err)
   end
 
@@ -207,12 +207,17 @@ function checker:add_target(ip, port, healthy)
     healthy = true
   end
 
-  return locking_target_list(self, function(target_list)
+  local target = (self.targets[ip] or EMPTY)[port]
+  if target then
+    return nil, ("target '%s:%s' already in local list"):format(ip, port)
+  end
+
+  local ok, err = locking_target_list(self, function(target_list)
 
     -- check whether we already have this target
     for _, target in ipairs(target_list) do
       if target.ip == ip and target.port == port then
-        return nil, ("target '%s:%s' already exists"):format(ip, port)
+        return nil, ("target '%s:%s' already in shared list"):format(ip, port)
       end
     end
 
@@ -228,7 +233,7 @@ function checker:add_target(ip, port, healthy)
     -- have a key in the shm.
     local ok, err = self.shm:set(get_shm_key(self.TARGET_STATUS, ip, port), healthy)
     if not ok then
-      self.log(ERR, "failed to set initial health status in shm: ", err)
+      self:log(ERR, "failed to set initial health status in shm: ", err)
     end
 
     ok, err = self.shm:set(self.TARGET_LIST, target_list)
@@ -236,12 +241,18 @@ function checker:add_target(ip, port, healthy)
       return nil, "failed to store target_list in shm: " .. err
     end
 
+    return true
+  end)
+
+  if ok then
     -- raise event for our newly added target
     local event = healthy and "healthy" or "unhealthy"
     self:raise_event(self.events[event], ip, port)
-
     return true
-  end)
+  end
+
+  return nil, err
+
 end
 
 
@@ -284,7 +295,7 @@ function checker:remove_target(ip, port)
     -- remove health status from shm
     ok, err = self.shm:set(get_shm_key(self.TARGET_STATUS, ip, port), nil)
     if not ok then
-      self.log(ERR, "failed to remove health status from shm: ", err)
+      self:log(ERR, "failed to remove health status from shm: ", err)
     end
 
     -- raise event for our removed target
@@ -365,7 +376,7 @@ end
 -- @return The results of the function; or nil and an error message
 -- in case it fails locking.
 local function locking_target(self, ip, port, fn)
-  local lock, lock_err = resty_lock.new(self.shm, {
+  local lock, lock_err = resty_lock:new(self.shm_name, {
                   exptime = 10,  -- timeout after which lock is released anyway
                   timeout = 5,   -- max wait time to acquire lock
                 })
@@ -384,7 +395,7 @@ local function locking_target(self, ip, port, fn)
   ok, err = lock:unlock()
   if not ok then
     -- recoverable: not returning this error, only logging it
-    self.log(ERR, "failed to release lock '", lock_key, "': ", err)
+    self:log(ERR, "failed to release lock '", lock_key, "': ", err)
   end
 
   return final_ok, final_err
@@ -423,10 +434,10 @@ local function incr_counter(self, health_mode, ip, port, limit, ctr_type)
   local target = (self.targets[ip] or EMPTY)[port]
   if not target then
     -- sync issue: warn, but return success
-    self.log(WARN, "trying to increment a target that is not in the list: ", ip, ":", port)
+    self:log(WARN, "trying to increment a target that is not in the list: ", ip, ":", port)
     return true
   end
-  
+
   if (health_mode == "healthy" and target.healthy) or
      (health_mode == "unhealthy" and not target.healthy) then
     -- No need to count successes when healthy or failures when unhealthy
@@ -550,7 +561,7 @@ end
 -- @param check (optional) the type of check, either "passive" or "active", default "passive"
 function checker:report_tcp_failure(ip, port, operation, check)
 
-  local limit = self.checks[check or "passive"].checks.unhealthy.tcp_failures
+  local limit = self.checks[check or "passive"].unhealthy.tcp_failures
 
   -- TODO what do we do with the `operation` information
 
@@ -586,7 +597,7 @@ function checker:run_single_check(ip, port, healthy)
     return
   end
 
-  sock:settimeout(self.timeout)
+  sock:settimeout(self.checks.active.timeout)
 
   local ok
   ok, err = sock:connect(ip, port)
@@ -609,7 +620,7 @@ function checker:run_single_check(ip, port, healthy)
   -- TODO: implement https
 
   local bytes
-  bytes, err = sock:send(self.http_request)
+  bytes, err = sock:send(self.checks.active.http_request)
   if not bytes then
     self:log(ERR, "failed to send http request to '", ip, ":", port, "': ", err)
     if err == "timeout" then
@@ -649,7 +660,7 @@ end
 -- executes a work package (a list of checks) sequentially
 function checker:run_work_package(work_package)
   for _, target in ipairs(work_package) do
-    self:run_single_check(target.ip, target.port)
+    self:run_single_check(target.ip, target.port, target.healthy)
   end
 end
 
@@ -667,7 +678,7 @@ function checker:active_check_targets(list)
     end
     package[#package + 1] = target
     idx = idx + 1
-    if idx > self.concurrency then idx = 1 end
+    if idx > self.checks.active.concurrency then idx = 1 end
   end
 
   -- hand out work-packages to the threads, note the "-1" because this timer
@@ -711,7 +722,7 @@ function checker:get_periodic_lock(health_mode)
     if err == "exists" then
       return false
     end
-    self:log("failed to add key \"", key, "\": ", err)
+    self:log(ERR, "failed to add key \"", key, "\": ", err)
     return nil
   end
   return true
@@ -911,17 +922,17 @@ local defaults = {
   shm_name = NO_DEFAULT,
   type = "http",
   timeout = 1000, -- TODO determine suitable default
-  concurrency = 10,
   checks = {
     active = {
-      http_request = nil,
+      concurrency = 10,
+      http_request = NO_DEFAULT,
       healthy = {
-        interval = 1000, -- 0 == no timer, TODO determine suitable default
+        interval = 5, -- 0 == no timer, TODO determine suitable default
         http_statuses = { 200, 302 },
         successes = 5, -- TODO determine suitable default
       },
       unhealthy = {
-        interval = 500, -- 0 == no timer, TODO determine suitable default
+        interval = 5, -- 0 == no timer, TODO determine suitable default
         http_statuses = { 429, 404,
                           500, 501, 502, 503, 504, 505 }, -- ...more?
         tcp_failures = 2, -- TODO determine suitable default
@@ -995,14 +1006,13 @@ function _M.new(opts)
   self.events = nil      -- hash table with supported events (prevent magic strings)
   self.stop = true       -- flag to idicate to timers to stop checking
   self.timer_count = 0   -- number of running timers
-  self.shm = nil         -- the shm to use (actual shm, not its name)
   self.ev_callback = nil -- callback closure per checker instance
 
   -- Convert status lists to sets
-  to_set(self.active_checks.unhealthy, "http_statuses")
-  to_set(self.active_checks.healthy, "http_statuses")
-  to_set(self.passive_checks.unhealthy, "http_statuses")
-  to_set(self.passive_checks.healthy, "http_statuses")
+  to_set(self.checks.active.unhealthy, "http_statuses")
+  to_set(self.checks.active.healthy, "http_statuses")
+  to_set(self.checks.passive.unhealthy, "http_statuses")
+  to_set(self.checks.passive.healthy, "http_statuses")
 
   -- decorate with methods and constants
   self.events = EVENTS
@@ -1016,6 +1026,7 @@ function _M.new(opts)
   self.TARGET_NOKS      = SHM_PREFIX .. self.name .. ":noks"
   self.TARGET_LIST      = SHM_PREFIX .. self.name .. ":target_list"
   self.TARGET_LIST_LOCK = SHM_PREFIX .. self.name .. ":target_list_lock"
+  self.TARGET_LOCK      = SHM_PREFIX .. self.name .. ":target_lock"
   self.PERIODIC_LOCK    = SHM_PREFIX .. self.name .. ":period_lock:"
   -- prepare constants
   self.EVENT_SOURCE     = EVENT_SOURCE_PREFIX .. " [" .. self.name .. "]"
