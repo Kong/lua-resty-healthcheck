@@ -53,6 +53,14 @@ for _, event in ipairs({
   EVENTS[event] = event
 end
 
+
+-- Some color for demo purposes
+local use_color = true
+local function green(str) return use_color and ("\027[32m" .. str .. "\027[0m") or str end
+local function red(str) return use_color and ("\027[32m" .. str .. "\027[0m") or str end
+local function worker_color(str) return use_color and ("\027["..tostring(31 + ngx.worker.pid() % 5).."m"..str.."\027[0m") or str end
+
+
 local _M = {}
 
 
@@ -499,7 +507,7 @@ function checker:report_failure(ip, port, check)
     limit = checks.unhealthy.http_errors
     ctr_type = CTR_HTTP
   end
-  
+
   return incr_counter(self, "unhealthy", ip, port, limit, ctr_type)
 
 end
@@ -588,8 +596,11 @@ end
 -- Healthcheck runner
 --============================================================================
 
+
 -- Runs a single healthcheck probe
 function checker:run_single_check(ip, port, healthy)
+
+  self:log(DEBUG, "Checking ", ip, ":", port, " (currently ", healthy and green("healthy") or red("unhealthy"), ")")
 
   local sock, err = ngx.socket.tcp()
   if not sock then
@@ -602,9 +613,6 @@ function checker:run_single_check(ip, port, healthy)
   local ok
   ok, err = sock:connect(ip, port)
   if not ok then
-    if healthy then
-      self:log(ERR, "failed to connect to '", ip, ":", port, "': ", err)
-    end
     if err == "timeout" then
       sock:close()  -- timeout errors do not close the socket.
       return self:report_timeout(ip, port, "active")
@@ -653,6 +661,8 @@ function checker:run_single_check(ip, port, healthy)
   end
 
   sock:close()
+
+  self:log(DEBUG, "Reporting ", ip, ":", port, " (got HTTP ", status, ")")
 
   return self:report_http_status(ip, port, status, "active")
 end
@@ -842,7 +852,7 @@ end
 -- Log a message specific to this checker
 -- @param level standard ngx log level constant
 function checker:log(level, ...)
-  ngx_log(level, self.LOG_PREFIX, ...)
+  ngx_log(level, worker_color(self.LOG_PREFIX), "\027[0m", ...)
 end
 
 
@@ -1048,16 +1058,18 @@ function _M.new(opts)
     if err then
       return nil, err
     end
+    self:log(DEBUG, "Got target list (", #self.targets, " targets)")
 
     -- load individual statuses
     for _, target in ipairs(self.targets) do
       target.healthy = self.shm:get(get_shm_key(self.TARGET_STATUS,
                                             target.ip, target.port))
+      self:log(DEBUG, "Got status ", target.healthy, " ", target.ip, ":", target.port)
       -- fill-in the hash part for easy lookup
       self.targets[target.ip] = self.targets[target.ip] or {}
       self.targets[target.ip][target.port] = target
     end
-    
+
     -- handle events to sync up in case there was a change by another worker
     worker_events:poll()
   end
@@ -1068,6 +1080,8 @@ function _M.new(opts)
     self:stop()
     return nil, err
   end
+
+  self:log(DEBUG, "Healthchecker started!")
 
   return self
 end
