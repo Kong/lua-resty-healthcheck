@@ -181,7 +181,8 @@ local function locking_target_list(self, fn)
     return nil, "failed to acquire lock: " .. err
   end
 
-  local target_list, err = fetch_target_list(self)
+  local target_list
+  target_list, err = fetch_target_list(self)
 
   local final_ok, final_err
 
@@ -217,6 +218,10 @@ function checker:add_target(ip, port, healthy)
 
   local target = (self.targets[ip] or EMPTY)[port]
   if target then
+    -- TODO: is this ok? the one truth is the shared list, and we're 
+    -- checking there anyway. Saves the lock, but also might introduce a
+    -- race condition? considering this is not a hot codepath, should we only
+    -- do the check inside the lock below?
     return nil, ("target '%s:%s' already in local list"):format(ip, port)
   end
 
@@ -732,7 +737,7 @@ function checker:get_periodic_lock(health_mode)
     if err == "exists" then
       return false
     end
-    self:log(ERR, "failed to add key \"", key, "\": ", err)
+    self:log(ERR, "failed to add key '", key, "': ", err)
     return nil
   end
   return true
@@ -1058,13 +1063,13 @@ function _M.new(opts)
     if err then
       return nil, err
     end
-    self:log(DEBUG, "Got target list (", #self.targets, " targets)")
+    self:log(DEBUG, "Got initial target list (", #self.targets, " targets)")
 
     -- load individual statuses
     for _, target in ipairs(self.targets) do
       target.healthy = self.shm:get(get_shm_key(self.TARGET_STATUS,
                                             target.ip, target.port))
-      self:log(DEBUG, "Got status ", target.healthy, " ", target.ip, ":", target.port)
+      self:log(DEBUG, "Got initial status ", target.healthy, " ", target.ip, ":", target.port)
       -- fill-in the hash part for easy lookup
       self.targets[target.ip] = self.targets[target.ip] or {}
       self.targets[target.ip][target.port] = target
@@ -1081,6 +1086,7 @@ function _M.new(opts)
     return nil, err
   end
 
+  --TODO: push entire config in debug level logs
   self:log(DEBUG, "Healthchecker started!")
 
   return self
