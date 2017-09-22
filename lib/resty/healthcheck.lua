@@ -216,21 +216,20 @@ function checker:add_target(ip, port, healthy)
     healthy = true
   end
 
-  local target = (self.targets[ip] or EMPTY)[port]
-  if target then
-    -- TODO: is this ok? the one truth is the shared list, and we're 
-    -- checking there anyway. Saves the lock, but also might introduce a
-    -- race condition? considering this is not a hot codepath, should we only
-    -- do the check inside the lock below?
-    return nil, ("target '%s:%s' already in local list"):format(ip, port)
-  end
-
   local ok, err = locking_target_list(self, function(target_list)
+
+    -- we first add the health status, and only then the updated list.
+    -- this prevents a state where a target is in the list, but does not
+    -- have a key in the shm.
+    local ok, err = self.shm:set(get_shm_key(self.TARGET_STATUS, ip, port), healthy)
+    if not ok then
+      self:log(ERR, "failed to set initial health status in shm: ", err)
+    end
 
     -- check whether we already have this target
     for _, target in ipairs(target_list) do
       if target.ip == ip and target.port == port then
-        return nil, ("target '%s:%s' already in shared list"):format(ip, port)
+        return true
       end
     end
 
@@ -240,14 +239,6 @@ function checker:add_target(ip, port, healthy)
       port = port,
     }
     target_list = serialize(target_list)
-
-    -- we first add the health status, and only then the updated list.
-    -- this prevents a state where a target is in the list, but does not
-    -- have a key in the shm.
-    local ok, err = self.shm:set(get_shm_key(self.TARGET_STATUS, ip, port), healthy)
-    if not ok then
-      self:log(ERR, "failed to set initial health status in shm: ", err)
-    end
 
     ok, err = self.shm:set(self.TARGET_LIST, target_list)
     if not ok then
