@@ -66,11 +66,54 @@ cannot start, 2 (of 2) timers are still running
             ngx.sleep(0.2) -- wait twice the interval
             local ok, err = checker:start()
             ngx.say(ok)
+            ngx.say(checker.timer_count)
         }
     }
 --- request
 GET /t
 --- response_body
 true
+2
+--- no_error_log
+[error]
+
+=== TEST 3: start() is a no-op if active intervals are 0
+--- http_config eval: $::HttpConfig
+--- config
+    location = /t {
+        content_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+            local checker = healthcheck.new({
+                name = "testing",
+                shm_name = "test_shm",
+                checks = {
+                    active = {
+                        healthy  = {
+                            interval = 0
+                        },
+                        unhealthy  = {
+                            interval = 0
+                        }
+                    }
+                }
+            })
+            local ok, err = checker:start()
+            ngx.say(ok)
+            local ok, err = checker:start()
+            ngx.say(ok)
+            local ok, err = checker:start()
+            ngx.say(ok)
+            ngx.say(checker.timer_count)
+        }
+    }
+--- request
+GET /t
+--- response_body
+true
+true
+true
+0
 --- no_error_log
 [error]
