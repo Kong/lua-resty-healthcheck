@@ -76,6 +76,28 @@ GET /t
 --- error_log
 required option 'shm_name' is missing
 
+=== TEST 3: new() fails with invalid shm
+--- http_config eval: $::HttpConfig
+--- config
+    location = /t {
+        content_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+            local ok, err = pcall(healthcheck.new, {
+                name = "testing",
+                shm_name = "invalid_shm",
+            })
+            ngx.log(ngx.ERR, err)
+        }
+    }
+--- request
+GET /t
+--- response_body
+
+--- error_log
+no shm found by name
+
 === TEST 4: new() initializes with default config
 --- http_config eval: $::HttpConfig
 --- config
