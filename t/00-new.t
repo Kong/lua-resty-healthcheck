@@ -76,7 +76,7 @@ GET /t
 --- error_log
 required option 'shm_name' is missing
 
-=== TEST 3: new() fails with invalid shm
+=== TEST 4: new() fails with invalid shm
 --- http_config eval: $::HttpConfig
 --- config
     location = /t {
@@ -98,7 +98,7 @@ GET /t
 --- error_log
 no shm found by name
 
-=== TEST 4: new() initializes with default config
+=== TEST 5: new() initializes with default config
 --- http_config eval: $::HttpConfig
 --- config
     location = /t {

@@ -734,6 +734,7 @@ function checker:get_periodic_lock(health_mode)
   return true
 end
 
+--- Generate an active health check callback function.
 -- @param health_mode either "healthy" or "unhealthy" to indicate what
 -- callback to generate.
 -- @return callback function

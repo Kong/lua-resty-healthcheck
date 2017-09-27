@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * (blocks() * 3);
+plan tests => repeat_each() * (blocks() * 3) + 6;
 
 my $pwd = cwd();
 
@@ -17,30 +17,7 @@ run_tests();
 
 __DATA__
 
-=== TEST 1: start() cannot start a second time
---- http_config eval: $::HttpConfig
---- config
-    location = /t {
-        content_by_lua_block {
-            local we = require "resty.worker.events"
-            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
-            local healthcheck = require("resty.healthcheck")
-            local checker = healthcheck.new({
-                name = "testing",
-                shm_name = "test_shm",
-            })
-            local ok, err = checker:start()
-            ngx.say(err)
-        }
-    }
---- request
-GET /t
---- response_body
-cannot start, 2 (of 2) timers are still running
---- no_error_log
-[error]
-
-=== TEST 2: start() can start after stop()
+=== TEST 1: add_target() adds an unhealthy target
 --- http_config eval: $::HttpConfig
 --- config
     location = /t {
@@ -62,23 +39,37 @@ cannot start, 2 (of 2) timers are still running
                     }
                 }
             })
-            local ok, err = checker:stop()
             ngx.sleep(0.2) -- wait twice the interval
-            local ok, err = checker:start()
+            local ok, err = checker:add_target("127.0.0.1", 11111, false)
             ngx.say(ok)
-            ngx.say(checker.timer_count)
+            ngx.sleep(0.2) -- wait twice the interval
         }
     }
 --- request
 GET /t
 --- response_body
 true
-2
---- no_error_log
-[error]
+--- error_log
+checking healthy targets: nothing to do
+checking unhealthy targets: nothing to do
+checking unhealthy targets: #1
 
-=== TEST 3: start() is a no-op if active intervals are 0
---- http_config eval: $::HttpConfig
+--- no_error_log
+checking healthy targets: #1
+
+
+=== TEST 2: add_target() adds a healthy target
+--- http_config eval
+qq{
+    $::HttpConfig
+
+    server {
+        listen 2112;
+        location = /status {
+            return 200;
+        }
+    }
+}
 --- config
     location = /t {
         content_by_lua_block {
@@ -90,30 +81,31 @@ true
                 shm_name = "test_shm",
                 checks = {
                     active = {
+                        http_request = "GET /status HTTP/1.0\r\nHost: example.com\r\n\r\n",
                         healthy  = {
-                            interval = 0
+                            interval = 0.1
                         },
                         unhealthy  = {
-                            interval = 0
+                            interval = 0.1
                         }
                     }
                 }
             })
-            local ok, err = checker:start()
+            ngx.sleep(0.2) -- wait twice the interval
+            local ok, err = checker:add_target("127.0.0.1", 2112, true)
             ngx.say(ok)
-            local ok, err = checker:start()
-            ngx.say(ok)
-            local ok, err = checker:start()
-            ngx.say(ok)
-            ngx.say(checker.timer_count)
+            ngx.sleep(0.2) -- wait twice the interval
         }
     }
 --- request
 GET /t
 --- response_body
 true
-true
-true
-0
+--- error_log
+checking healthy targets: nothing to do
+checking unhealthy targets: nothing to do
+checking healthy targets: #1
+
 --- no_error_log
-[error]
+checking unhealthy targets: #1
+
