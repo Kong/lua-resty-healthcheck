@@ -848,7 +848,7 @@ end
 -- Log a message specific to this checker
 -- @param level standard ngx log level constant
 function checker:log(level, ...)
-  ngx_log(level, worker_color(self.LOG_PREFIX), "\027[0m", ...)
+  ngx_log(level, worker_color(self.LOG_PREFIX), ...)
 end
 
 
