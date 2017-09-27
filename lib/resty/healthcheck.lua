@@ -1003,7 +1003,9 @@ function _M.new(opts)
 
   local self = fill_in_settings(opts, defaults)
 
+  assert(self.name, "required option 'name' is missing")
   assert(self.shm_name, "required option 'shm_name' is missing")
+
   self.shm = ngx.shared[tostring(opts.shm_name)]
   assert(self.shm, ("no shm found by name '%s'"):format(opts.shm_name))
 
