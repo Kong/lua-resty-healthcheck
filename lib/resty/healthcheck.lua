@@ -740,7 +740,7 @@ end
 local function make_checker_callback(health_mode)
   local callback
   callback = function(premature, self)
-    if premature or self.stop then
+    if premature or self.stopping then
       self.timer_count = self.timer_count - 1
       return
     end
@@ -861,7 +861,7 @@ end
 --- Stop the background health checks.
 -- @return true
 function checker:stop()
-  self.stop = true
+  self.stopping = true
   -- unregister event handler, to be eligible for GC
   worker_events.unregister(self.ev_callback, self.EVENT_SOURCE)
   return true
@@ -871,7 +871,7 @@ end
 --- Starts the background health checks.
 -- @return true or nil+error
 function checker:start()
-  if not self.timer_count == 0 then
+  if self.timer_count ~= 0 then
     return nil, "cannot start, " .. self.timer_count .. " (of 2) timers are still running"
   end
 
@@ -895,7 +895,7 @@ function checker:start()
   worker_events.unregister(self.ev_callback, self.EVENT_SOURCE)  -- ensure we never double subscribe
   worker_events.register(self.ev_callback, self.EVENT_SOURCE)
 
-  self.stop = false  -- do this at the end, so if either creation fails, the other stops also
+  self.stopping = false  -- do this at the end, so if either creation fails, the other stops also
   return true
 end
 
@@ -1012,7 +1012,7 @@ function _M.new(opts)
   -- other properties
   self.targets = nil     -- list of targets, initially loaded, maintained by events
   self.events = nil      -- hash table with supported events (prevent magic strings)
-  self.stop = true       -- flag to idicate to timers to stop checking
+  self.stopping = true   -- flag to idicate to timers to stop checking
   self.timer_count = 0   -- number of running timers
   self.ev_callback = nil -- callback closure per checker instance
 
