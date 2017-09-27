@@ -216,6 +216,90 @@ function checker:add_target(ip, port, healthy)
     healthy = true
   end
 
+  --[[
+
+  If the update is identical to a target's own internal state,
+  there is no need to broadcast it to other targets.
+
+  We claim this optimization is safe, and no workers will stay inconsistent.
+
+  Let W:add_target(T=S1, S2) be a function running in worker W,
+  which updates internal state T=S1 to new state T=S2 in a worker W.
+  It is implemented as the following:
+
+  W:add_target(T=S1, S2):
+     (Optimization:) if S1 = S2, it does not broadcast to other workers and quits.
+     Otherwise, it updates its state to T=S2 and broadcasts to all workers.
+
+  Lemma: Every state T=S known by a worker was broadcasted at some point.
+     Proof:
+        State T=S was set by the worker itself or received from others.
+        Case 1: If it was received from others (event or target list)
+                --> it was broadcasted.
+        Case 2: If it was set by the worker itself:
+                   (Base case) it was the initial state, set via W:add_target(T=nil, S)
+                               --> initial states are always broadcasted.
+                   (Induction) it retained a previous state
+                               --> which was broadcasted at some point.
+
+  Proof by contradiction of the main claim:
+
+  Suppose that not broadcasting W:add_target(T=S, S)
+  will produce an inconsistency, that is:
+  worker W will have state T=S, another worker W' will have a different state T=S'.
+
+  By the lemma, both states T=S and T=S' are broadcasted at some point.
+  The order in which they are broadcasted is arbitrary,
+  but our system ensures that events are received by all workers in the same order.
+  In order to be a non-broadcasting call, add_target must run after T=S is set.
+
+  So, we have the following cases:
+
+  Case 1: T=S first, then T=S'
+          We have two sub-cases, because add_target must run after T=S, but it
+          may run before or after T=S' arrives.
+
+          Sub-case 1: add_target runs before T=S' is set
+                  * W receives T=S
+                  * W:add_target(T=S, S), does not broadcast
+                  * W receives T=S'
+                  * --> W is now T=S'
+                  In parallel, W' receives T=S then T=S'
+                  * --> W' is now T=S'
+                  ==> No inconsistency in this case.
+
+          Sub-case 2: add_target runs after T=S' is set
+                  * W receives T=S
+                  * W receives T=S'
+                  * W:add_target(T=S', S), broadcasting call
+                  * --> W is now T=S
+                  In parallel, W' receives T=S then T=S' then the broadcasted T=S
+                  * --> W' is now T=S
+                  ==> No inconsistency in this case.
+
+  Case 2: T=S' first, then T=S
+          There are no sub-cases, because add_target must run after T=S is set.
+
+          * W receives T=S'
+          * W receives T=S
+          * W:add_target(T=S, S), does not broadcast
+          * --> W is now T=S
+          In parallel, W' receives T=S' then T=S
+          * --> W' is now T=S
+          ==> No inconsistency in this case.
+
+  We assumed state S' would exist because of an inconsistency, but no
+  inconsistency can arise from its existence. We arrived at the contradiction.
+
+  Therefore, not broadcasting W:add_target(T=S, S) _cannot_ put the system
+  in an inconsistent state, CQD.
+
+  ]]
+  local target = (self.targets[ip] or EMPTY)[port]
+  if target and target.healthy == healthy then
+    return nil, ("target '%s:%s' already in local list"):format(ip, port)
+  end
+
   local ok, err = locking_target_list(self, function(target_list)
 
     -- we first add the health status, and only then the updated list.
@@ -268,6 +352,15 @@ end
 function checker:remove_target(ip, port)
   ip   = tostring(assert(ip, "no ip address provided"))
   port = tostring(assert(port, "no port number provided"))
+
+  --[[
+  In remove_target we cannot apply the same optimization as add_target,
+  because the initial state T=nil is not-broadcasted.
+  (We could do it if we distinguished "broadcasted nils", but
+  add_target is subject to the initialization burst,
+  while remove_target is not, so at this point this optimization
+  does not seem necessary.)
+  ]]
 
   return locking_target_list(self, function(target_list)
 
