@@ -8,3 +8,4 @@ readme='readme.md'
 sort=true
 sort_modules=true
 all=false
+style='./docs/'

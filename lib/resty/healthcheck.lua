@@ -142,9 +142,10 @@ end
 local checker = {}
 
 
---============================================================================
--- Node management
---============================================================================
+------------------------------------------------------------------------------
+-- Node management.
+-- @section node-management
+------------------------------------------------------------------------------
 
 
 -- @return the target list from the shm, an empty table if not found, or
@@ -310,11 +311,6 @@ function checker:remove_target(ip, port)
 end
 
 
-
---============================================================================
--- Status management
---============================================================================
-
 --- Gets the current status of the target
 -- @param ip ip-address of the target being checked
 -- @param port the port being checked against
@@ -365,9 +361,11 @@ end
 
 
 
---============================================================================
--- Health management
---============================================================================
+------------------------------------------------------------------------------
+-- Health management.
+-- Functions that allow reporting of failures/successes for passive checks.
+-- @section health-management
+------------------------------------------------------------------------------
 
 
 --- Run the given function holding a lock on the target.
@@ -842,9 +840,10 @@ function checker:event_handler(event_name, ip, port)
 end
 
 
---============================================================================
--- Miscellaneous
---============================================================================
+------------------------------------------------------------------------------
+-- Initializing.
+-- @section initializing
+------------------------------------------------------------------------------
 
 -- Log a message specific to this checker
 -- @param level standard ngx log level constant
