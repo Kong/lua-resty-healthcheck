@@ -602,7 +602,7 @@ function checker:run_single_check(ip, port, healthy)
     return
   end
 
-  sock:settimeout(self.checks.active.timeout)
+  sock:settimeout(self.checks.active.timeout * 1000)
 
   local ok
   ok, err = sock:connect(ip, port)
