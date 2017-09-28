@@ -33,7 +33,7 @@ local EMPTY = setmetatable({},{
 
 -- Counters: a 32-bit shm integer can hold up to four 8-bit counters.
 -- Here, we are using three.
-local CTR_HTTP    = 0x000000   -- TODO: 0x01 maybe?
+local CTR_HTTP    = 0x000000
 local CTR_TCP     = 0x000100
 local CTR_TIMEOUT = 0x010000
 local CTR_SUCCESS = CTR_HTTP   -- same, but stored in separate shm value
@@ -207,12 +207,14 @@ end
 --- Add a target to the healthchecker.
 -- @param ip ip-address of the target to check
 -- @param port the port to check against
+-- @param hostname Hostname to use in the the HTTP request.
 -- @param healthy (optional) a boolean value indicating the initial state,
 -- default is true
 -- @return true on success, nil+err on failure
-function checker:add_target(ip, port, healthy)
-  ip   = tostring(assert(ip, "no ip address provided"))
+function checker:add_target(ip, port, hostname, healthy)
+  ip = tostring(assert(ip, "no ip address provided"))
   port = tostring(assert(port, "no port number provided"))
+  hostname = hostname or ip
   if healthy == nil then
     healthy = true
   end
@@ -238,6 +240,7 @@ function checker:add_target(ip, port, healthy)
     target_list[#target_list + 1] = {
       ip = ip,
       port = port,
+      hostname = hostname,
     }
     target_list = serialize(target_list)
 
@@ -252,7 +255,7 @@ function checker:add_target(ip, port, healthy)
   if ok then
     -- raise event for our newly added target
     local event = healthy and "healthy" or "unhealthy"
-    self:raise_event(self.events[event], ip, port)
+    self:raise_event(self.events[event], ip, port, hostname)
     return true
   end
 
@@ -304,7 +307,7 @@ function checker:remove_target(ip, port)
     end
 
     -- raise event for our removed target
-    self:raise_event(self.events.remove, ip, port)
+    self:raise_event(self.events.remove, ip, port, target_found.hostname)
 
     return true
   end)
@@ -472,7 +475,7 @@ local function incr_counter(self, health_mode, ip, port, limit, ctr_type)
     if ctr >= limit then
       local status_key = get_shm_key(self.TARGET_STATUS, ip, port)
       self.shm:set(status_key, health_mode == "healthy")
-      self:raise_event(self.events[health_mode], ip, port)
+      self:raise_event(self.events[health_mode], ip, port, target.hostname)
     end
 
     return true
@@ -592,7 +595,7 @@ end
 
 
 -- Runs a single healthcheck probe
-function checker:run_single_check(ip, port, healthy)
+function checker:run_single_check(ip, port, hostname, healthy)
 
   self:log(DEBUG, "Checking ", ip, ":", port, " (currently ", healthy and green("healthy") or red("unhealthy"), ")")
 
@@ -621,8 +624,11 @@ function checker:run_single_check(ip, port, healthy)
 
   -- TODO: implement https
 
+  local path = self.checks.active.http_path
+  local request = ("GET %s HTTP/1.0\r\nHost: %s\r\n\r\n"):format(path, hostname)
+
   local bytes
-  bytes, err = sock:send(self.checks.active.http_request)
+  bytes, err = sock:send(request)
   if not bytes then
     self:log(ERR, "failed to send http request to '", ip, ":", port, "': ", err)
     if err == "timeout" then
@@ -664,7 +670,7 @@ end
 -- executes a work package (a list of checks) sequentially
 function checker:run_work_package(work_package)
   for _, target in ipairs(work_package) do
-    self:run_single_check(target.ip, target.port, target.healthy)
+    self:run_single_check(target.ip, target.port, target.hostname, target.healthy)
   end
 end
 
@@ -794,7 +800,7 @@ checker.healthy_callback = make_checker_callback("healthy")
 checker.unhealthy_callback = make_checker_callback("unhealthy")
 
 -- Event handler callback
-function checker:event_handler(event_name, ip, port)
+function checker:event_handler(event_name, ip, port, hostname)
 
   local target_found = (self.targets[ip] or EMPTY)[port]
 
@@ -823,7 +829,7 @@ function checker:event_handler(event_name, ip, port)
          event_name == self.events.unhealthy then
     if not target_found then
       -- it is a new target, must add it first
-      target_found = { ip = ip, port = port }
+      target_found = { ip = ip, port = port, hostname = hostname }
       self.targets[target_found.ip] = self.targets[target_found.ip] or {}
       self.targets[target_found.ip][target_found.port] = target_found
       self.targets[#self.targets + 1] = target_found
@@ -853,8 +859,9 @@ end
 
 
 -- Raises an event for a target status change.
-function checker:raise_event(event_name, ip, port)
-  worker_events.post(self.EVENT_SOURCE, event_name, { ip = ip, port = port })
+function checker:raise_event(event_name, ip, port, hostname)
+  local target = { ip = ip, port = port, hostname = hostname }
+  worker_events.post(self.EVENT_SOURCE, event_name, target)
 end
 
 
@@ -927,23 +934,23 @@ local defaults = {
   name = NO_DEFAULT,
   shm_name = NO_DEFAULT,
   type = "http",
-  timeout = 1000, -- TODO determine suitable default
   checks = {
     active = {
+      timeout = 1,
       concurrency = 10,
-      http_request = NO_DEFAULT,
+      http_path = "/",
       healthy = {
-        interval = 5, -- 0 == no timer, TODO determine suitable default
+        interval = 5,
         http_statuses = { 200, 302 },
-        successes = 5, -- TODO determine suitable default
+        successes = 2,
       },
       unhealthy = {
-        interval = 5, -- 0 == no timer, TODO determine suitable default
+        interval = 1,
         http_statuses = { 429, 404,
-                          500, 501, 502, 503, 504, 505 }, -- ...more?
-        tcp_failures = 2, -- TODO determine suitable default
-        timeouts = 7, -- TODO determine suitable default
-        http_errors = 5, -- TODO determine suitable default
+                          500, 501, 502, 503, 504, 505 },
+        tcp_failures = 2,
+        timeouts = 3,
+        http_errors = 5,
       },
     },
     passive = {
@@ -975,16 +982,17 @@ end
 --- Creates a new health-checker instance.
 -- It will be started upon creation.
 -- @param opts table with checker options. Options are:
+--
 -- * `name`: name of the health checker
 -- * `shm_name`: the shm to use (actual shm, not its name)
 -- * `type`: "http", "https" or "tcp"
--- * `checks.active.timeout`: socket timeout for active checks
+-- * `checks.active.timeout`: socket timeout for active checks (in seconds)
 -- * `checks.active.concurrency`: number of targets to check concurrently
--- * `checks.active.http_request`: string of a complete HTTP request to run on active checks
--- * `checks.active.healthy.interval`: interval between checks for healthy targets
+-- * `checks.active.http_path`: path to use in `GET` HTTP request to run on active checks
+-- * `checks.active.healthy.interval`: interval between checks for healthy targets (in seconds)
 -- * `checks.active.healthy.http_statuses`: which HTTP statuses to consider a success
 -- * `checks.active.healthy.successes`: number of successes to consider a target healthy
--- * `checks.active.unhealthy.interval`: interval between checks for unhealthy targets
+-- * `checks.active.unhealthy.interval`: interval between checks for unhealthy targets (in seconds)
 -- * `checks.active.unhealthy.http_statuses`: which HTTP statuses to consider a failure
 -- * `checks.active.unhealthy.tcp_failures`: number of TCP failures to consider a target unhealthy
 -- * `checks.active.unhealthy.timeouts`: number of HTTP errors to consider a target unhealthy
@@ -1045,7 +1053,7 @@ function _M.new(opts)
   do
     self.ev_callback = function(data, event)
       -- just a wrapper to be able to access `self` as a closure
-      return self:event_handler(event, data.ip, data.port)
+      return self:event_handler(event, data.ip, data.port, data.hostname)
     end
     worker_events.register(self.ev_callback, self.EVENT_SOURCE)
 
