@@ -81,7 +81,7 @@ qq{
                 shm_name = "test_shm",
                 checks = {
                     active = {
-                        http_request = "GET /status HTTP/1.0\r\nHost: example.com\r\n\r\n",
+                        http_path = "/status",
                         healthy  = {
                             interval = 0.1
                         },
