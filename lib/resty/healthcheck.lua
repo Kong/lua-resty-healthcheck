@@ -38,6 +38,15 @@ local CTR_TCP     = 0x000100
 local CTR_TIMEOUT = 0x010000
 local CTR_SUCCESS = CTR_HTTP   -- same, but stored in separate shm value
 
+local CTR_NAME_FAILURE = {
+  [CTR_HTTP]    = "HTTP",
+  [CTR_TCP]     = "TCP",
+  [CTR_TIMEOUT] = "TIMEOUT",
+}
+
+local CTR_NAME_SUCCESS = {
+  [CTR_SUCCESS] = "SUCCESS"
+}
 
 local EVENTS = setmetatable({}, {
   __index = function(self, key)
@@ -60,6 +69,8 @@ local function green(str) return use_color and ("\027[32m" .. str .. "\027[0m") 
 local function red(str) return use_color and ("\027[31m" .. str .. "\027[0m") or str end
 local function worker_color(str) return use_color and ("\027["..tostring(31 + ngx.worker.pid() % 5).."m"..str.."\027[0m") or str end
 
+-- Debug function
+local function dump(...) print(require("pl.pretty").write({...})) end
 
 local _M = {}
 
@@ -215,7 +226,7 @@ end
 -- @return true on success, nil+err on failure
 function checker:add_target(ip, port, hostname, healthy)
   ip = tostring(assert(ip, "no ip address provided"))
-  port = tostring(assert(port, "no port number provided"))
+  port = assert(tonumber(port), "no port number provided")
   hostname = hostname or ip
   if healthy == nil then
     healthy = true
@@ -227,7 +238,7 @@ function checker:add_target(ip, port, hostname, healthy)
     for _, target in ipairs(target_list) do
       if target.ip == ip and target.port == port then
         self:log(DEBUG, "adding an existing target: ", ip, ":", port, " (ignoring)")
-        return true
+        return false
       end
     end
 
@@ -260,6 +271,9 @@ function checker:add_target(ip, port, hostname, healthy)
     local event = healthy and "healthy" or "unhealthy"
     self:raise_event(self.events[event], ip, port, hostname)
     return true
+  elseif ok == false then
+    -- the target already existed, no event, but still success
+    return true
   end
 
   return nil, err
@@ -274,7 +288,7 @@ end
 -- @return true on success, nil+err on failure
 function checker:remove_target(ip, port)
   ip   = tostring(assert(ip, "no ip address provided"))
-  port = tostring(assert(port, "no port number provided"))
+  port = assert(tonumber(port), "no port number provided")
 
   return locking_target_list(self, function(target_list)
 
@@ -323,7 +337,7 @@ end
 -- @return `true` if healthy, `false` if unhealthy, or nil+error on failure
 function checker:get_target_status(ip, port)
 
-  local target = (self.targets[ip] or EMPTY)[port]
+  local target = (self.targets[ip] or EMPTY)[tonumber(port)]
   if not target then
     return nil, "target not found"
   end
@@ -439,6 +453,7 @@ end
 -- @return True if succeeded, or nil and an error message.
 local function incr_counter(self, health_mode, ip, port, limit, ctr_type)
 
+  port = tonumber(port)
   local target = (self.targets[ip] or EMPTY)[port]
   if not target then
     -- sync issue: warn, but return success
@@ -452,13 +467,15 @@ local function incr_counter(self, health_mode, ip, port, limit, ctr_type)
     return true
   end
 
-  local counter, other
+  local counter, other, type_name
   if health_mode == "healthy" then
-    counter = self.TARGET_OKS
-    other   = self.TARGET_NOKS
+    counter   = self.TARGET_OKS
+    other     = self.TARGET_NOKS
+    type_name = CTR_NAME_SUCCESS[ctr_type]
   else
-    counter = self.TARGET_NOKS
-    other   = self.TARGET_OKS
+    counter   = self.TARGET_NOKS
+    other     = self.TARGET_OKS
+    type_name = CTR_NAME_FAILURE[ctr_type]
   end
 
   return locking_target(self, ip, port, function()
@@ -470,6 +487,10 @@ local function incr_counter(self, health_mode, ip, port, limit, ctr_type)
     end
 
     local ctr = ctr_get(multictr, ctr_type)
+
+    self:log(WARN, health_mode, " ", type_name, " increment (", ctr, "/",
+                   limit, ") for ", ip, ":", port)
+
     if ctr == 1 then
       local other_key = get_shm_key(other, ip, port)
       self.shm:set(other_key, 0)
@@ -504,7 +525,7 @@ function checker:report_failure(ip, port, check)
     limit = checks.unhealthy.tcp_failures
     ctr_type = CTR_TCP
   else
-    limit = checks.unhealthy.http_errors
+    limit = checks.unhealthy.http_failures
     ctr_type = CTR_HTTP
   end
 
@@ -549,7 +570,7 @@ function checker:report_http_status(ip, port, http_status, check)
   elseif checks.unhealthy.http_statuses[http_status]
       or http_status == 0 then
     status_type = "unhealthy"
-    limit = checks.unhealthy.http_errors
+    limit = checks.unhealthy.http_failures
   else
     return
   end
@@ -822,10 +843,10 @@ function checker:event_handler(event_name, ip, port, hostname)
           break
         end
       end
-      self:log(DEBUG, "event received: target '", ip, ":", port, "' removed")
+      self:log(DEBUG, "event: target '", ip, ":", port, "' removed")
 
     else
-      self:log(WARN, "event received to remove an unknown target '", ip, ":", port)
+      self:log(WARN, "event: trying to remove an unknown target '", ip, ":", port)
     end
 
   elseif event_name == self.events.healthy or
@@ -836,15 +857,15 @@ function checker:event_handler(event_name, ip, port, hostname)
       self.targets[target_found.ip] = self.targets[target_found.ip] or {}
       self.targets[target_found.ip][target_found.port] = target_found
       self.targets[#self.targets + 1] = target_found
-      self:log(DEBUG, "event received: target added ", ip, ":", port)
+      self:log(DEBUG, "event: target added ", ip, ":", port)
     end
     local health = (event_name == self.events.healthy)
-    self:log(DEBUG, "event received target status '", ip, ":", port,
+    self:log(DEBUG, "event: target status '", ip, ":", port,
                     "' from '", target_found.healthy, "' to '", health, "'")
     target_found.healthy = health
 
   else
-    self:log(WARN, "unknown event received: ", event_name)
+    self:log(WARN, "event: unknown event received '", event_name, "'")
   end
 end
 
@@ -869,11 +890,19 @@ end
 
 
 --- Stop the background health checks.
+-- WARNING: only call this method before letting it go.
+-- You cannot temporarily stop and restart it currently!
 -- @return true
 function checker:stop()
   self.stopping = true
   -- unregister event handler, to be eligible for GC
+  -- TODO: update worker_events such that unregistering is no longer necessary
+  -- currently stopping the timers will unregister, hence no events will be handled
+  -- and the local list will get out of sync!!!
+  -- Once updated, add a test proving that a running checker can be GC'ed, and
+  -- another to prove that stopped timers still handle events to keep in-sync
   worker_events.unregister(self.ev_callback, self.EVENT_SOURCE)
+  self:log(DEBUG, "timers stopped")
   return true
 end
 
@@ -906,6 +935,7 @@ function checker:start()
   worker_events.register(self.ev_callback, self.EVENT_SOURCE)
 
   self.stopping = false  -- do this at the end, so if either creation fails, the other stops also
+  self:log(DEBUG, "timers started")
   return true
 end
 
@@ -953,7 +983,7 @@ local defaults = {
                           500, 501, 502, 503, 504, 505 },
         tcp_failures = 2,
         timeouts = 3,
-        http_errors = 5,
+        http_failures = 5,
       },
     },
     passive = {
@@ -966,7 +996,7 @@ local defaults = {
         http_statuses = { 429, 503 },
         tcp_failures = 2, -- TODO determine suitable default
         timeouts = 7, -- TODO determine suitable default
-        http_errors = 5, -- TODO determine suitable default
+        http_failures = 5, -- TODO determine suitable default
       },
     },
   },
@@ -998,14 +1028,14 @@ end
 -- * `checks.active.unhealthy.interval`: interval between checks for unhealthy targets (in seconds)
 -- * `checks.active.unhealthy.http_statuses`: which HTTP statuses to consider a failure
 -- * `checks.active.unhealthy.tcp_failures`: number of TCP failures to consider a target unhealthy
--- * `checks.active.unhealthy.timeouts`: number of HTTP errors to consider a target unhealthy
--- * `checks.active.unhealthy.http_errors`: number of HTTP errors to consider a target unhealthy
+-- * `checks.active.unhealthy.timeouts`: number of timeouts to consider a target unhealthy
+-- * `checks.active.unhealthy.http_failures`: number of HTTP failures to consider a target unhealthy
 -- * `checks.passive.healthy.http_statuses`: which HTTP statuses to consider a failure
 -- * `checks.passive.healthy.successes`: number of successes to consider a target healthy
 -- * `checks.passive.unhealthy.http_statuses`: which HTTP statuses to consider a success
 -- * `checks.passive.unhealthy.tcp_failures`: number of TCP failures to consider a target unhealthy
--- * `checks.passive.unhealthy.timeouts`: number of HTTP errors to consider a target unhealthy
--- * `checks.passive.unhealthy.http_errors`: number of HTTP errors to consider a target unhealthy
+-- * `checks.passive.unhealthy.timeouts`: number of timeouts to consider a target unhealthy
+-- * `checks.passive.unhealthy.http_failures`: number of HTTP failures to consider a target unhealthy
 -- @return checker object, or nil + error
 function _M.new(opts)
 
@@ -1090,9 +1120,8 @@ function _M.new(opts)
     return nil, err
   end
 
-  --TODO: push entire config in debug level logs
+  -- TODO: push entire config in debug level logs
   self:log(DEBUG, "Healthchecker started!")
-
   return self
 end
 

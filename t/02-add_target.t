@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * (blocks() * 3) + 6;
+plan tests => repeat_each() * (blocks() * 4) + 6;
 
 my $pwd = cwd();
 
@@ -58,6 +58,7 @@ checking unhealthy targets: #1
 checking healthy targets: #1
 
 
+
 === TEST 2: add_target() adds a healthy target
 --- http_config eval
 qq{
@@ -109,3 +110,59 @@ checking healthy targets: #1
 --- no_error_log
 checking unhealthy targets: #1
 
+
+
+=== TEST 3: calling add_target() repeatedly does not change status
+--- http_config eval
+qq{
+    $::HttpConfig
+
+    server {
+        listen 2113;
+        location = /status {
+            return 200;
+        }
+    }
+}
+--- config
+    location = /t {
+        content_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+            local checker = healthcheck.new({
+                name = "testing",
+                shm_name = "test_shm",
+                checks = {
+                    active = {
+                        http_path = "/status",
+                        healthy  = {
+                            interval = 0.1,
+                            successes = 1,
+                        },
+                        unhealthy  = {
+                            interval = 0.1,
+                            tcp_failures = 1,
+                            http_failures = 1,
+                        }
+                    }
+                }
+            })
+            ngx.sleep(0.2) -- wait twice the interval
+            local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2113, nil, false)
+            ngx.say(ok)
+            ngx.sleep(0.2) -- wait twice the interval
+        }
+    }
+--- request
+GET /t
+--- response_body
+true
+--- error_log
+checking healthy targets: nothing to do
+checking unhealthy targets: nothing to do
+checking healthy targets: #1
+
+--- no_error_log
+checking unhealthy targets: #1
