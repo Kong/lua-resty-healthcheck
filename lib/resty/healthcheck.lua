@@ -205,6 +205,8 @@ end
 
 
 --- Add a target to the healthchecker.
+-- When the ip+port combination already exists, it will simply return success
+-- (without updating the `hostname` and/or the `healthy` status).
 -- @param ip ip-address of the target to check
 -- @param port the port to check against
 -- @param hostname Hostname to use in the the HTTP request.
@@ -221,19 +223,20 @@ function checker:add_target(ip, port, hostname, healthy)
 
   local ok, err = locking_target_list(self, function(target_list)
 
+    -- check whether we already have this target
+    for _, target in ipairs(target_list) do
+      if target.ip == ip and target.port == port then
+        self:log(DEBUG, "adding an existing target: ", ip, ":", port, " (ignoring)")
+        return true
+      end
+    end
+
     -- we first add the health status, and only then the updated list.
     -- this prevents a state where a target is in the list, but does not
     -- have a key in the shm.
     local ok, err = self.shm:set(get_shm_key(self.TARGET_STATUS, ip, port), healthy)
     if not ok then
       self:log(ERR, "failed to set initial health status in shm: ", err)
-    end
-
-    -- check whether we already have this target
-    for _, target in ipairs(target_list) do
-      if target.ip == ip and target.port == port then
-        return true
-      end
     end
 
     -- target does not exist, go add it
