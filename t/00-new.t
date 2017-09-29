@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * (blocks() * 3);
+plan tests => repeat_each() * (blocks() * 3) - 1;
 
 my $pwd = cwd();
 
@@ -118,3 +118,39 @@ GET /t
 
 --- error_log
 Healthchecker started!
+
+=== TEST 6: new() only accepts http or tcp types
+--- http_config eval: $::HttpConfig
+--- config
+    location = /t {
+        content_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+            local ok, err = pcall(healthcheck.new, {
+                name = "testing",
+                shm_name = "test_shm",
+                type = "http",
+            })
+            ngx.say(ok)
+            local ok, err = pcall(healthcheck.new, {
+                name = "testing",
+                shm_name = "test_shm",
+                type = "tcp",
+            })
+            ngx.say(ok)
+            local ok, err = pcall(healthcheck.new, {
+                name = "testing",
+                shm_name = "test_shm",
+                type = "get lost",
+            })
+            ngx.say(ok)
+        }
+    }
+--- request
+GET /t
+--- response_body
+true
+true
+false
+

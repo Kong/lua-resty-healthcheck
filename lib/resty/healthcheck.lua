@@ -1046,6 +1046,8 @@ function _M.new(opts)
 
   assert(self.name, "required option 'name' is missing")
   assert(self.shm_name, "required option 'shm_name' is missing")
+  assert(({ http = true, tcp = true })[self.type], "type can only be 'http' " ..
+          "or 'tcp', got '" .. tostring(self.type) .. "'")
 
   self.shm = ngx.shared[tostring(opts.shm_name)]
   assert(self.shm, ("no shm found by name '%s'"):format(opts.shm_name))
