@@ -993,7 +993,7 @@ local defaults = {
         successes = 5, -- TODO determine suitable default
       },
       unhealthy = {
-        http_statuses = { 429, 503 },
+        http_statuses = { 429, 500, 503 },
         tcp_failures = 2, -- TODO determine suitable default
         timeouts = 7, -- TODO determine suitable default
         http_failures = 5, -- TODO determine suitable default
