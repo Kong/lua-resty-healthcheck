@@ -15,7 +15,7 @@
 -- as long as the `name` is unique.
 --
 -- - Active healthchecks will be synchronized across workers, such that only
--- a single active healthcheck runs. 
+-- a single active healthcheck runs.
 --
 -- - Events will be raised in every worker, see [lua-resty-worker-events](https://github.com/Mashape/lua-resty-worker-events)
 -- for details.
@@ -1016,7 +1016,7 @@ end
 -- @param opts table with checker options. Options are:
 --
 -- * `name`: name of the health checker
--- * `shm_name`: the shm to use (actual shm, not its name)
+-- * `shm_name`: the name of the `lua_shared_dict` specified in the Nginx configuration to use
 -- * `type`: "http", "https" or "tcp"
 -- * `checks.active.timeout`: socket timeout for active checks (in seconds)
 -- * `checks.active.concurrency`: number of targets to check concurrently
