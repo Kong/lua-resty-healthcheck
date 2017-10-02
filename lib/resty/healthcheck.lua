@@ -1,6 +1,25 @@
 --------------------------------------------------------------------------
 -- Healthcheck library for OpenResty.
 --
+-- Some notes on the usage of this library:
+--
+-- - Each target will have 4 counters, 1 success counter and 3 failure
+-- counters ('http', 'tcp', and 'timeout'). Any failure will _only_ reset the
+-- success counter, but a success will reset _all three_ failure counters.
+--
+-- - All targets are uniquely identified by their IP address and port number
+-- combination, most functions take those as arguments.
+--
+-- - All keys in the SHM will be namespaced by the healthchecker name as
+-- provided to the `new` function. Hence no collissions will occur on shm-keys
+-- as long as the `name` is unique.
+--
+-- - Active healthchecks will be synchronized across workers, such that only
+-- a single active healthcheck runs. 
+--
+-- - Events will be raised in every worker, see [lua-resty-worker-events](https://github.com/Mashape/lua-resty-worker-events)
+-- for details.
+--
 -- @copyright 2017 Kong Inc.
 -- @author Hisham Muhammad, Thijs Schreijer
 -- @license Apache 2.0
@@ -48,13 +67,44 @@ local CTR_NAME_SUCCESS = {
   [CTR_SUCCESS] = "SUCCESS"
 }
 
+
+--- The list of potential events generated.
+-- The `checker.EVENT_SOURCE` field can be used to subscribe to the events, see the
+-- example below. Each of the events will get a table passed containing
+-- the target details `ip`, `port`, and `hostname`.
+-- See [lua-resty-worker-events](https://github.com/Mashape/lua-resty-worker-events).
+-- @field remove Event raised when a target is removed from the checker.
+-- @field healthy This event is raised when the target status changed to
+-- healthy (and when a target is added as `healthy`).
+-- @field unhealthy This event is raised when the target status changed to
+-- unhealthy (and when a target is added as `unhealthy`).
+-- @table checker.events
+-- @usage -- Register for all events from `my_checker`
+-- local event_callback = function(target, event, source, source_PID)
+--   local t = target.ip .. ":" .. target.port .." by name '" ..
+--             target.hostname .. "' ")
+--
+--   if event == my_checker.events.remove then
+--     print(t .. "has been removed")
+--
+--   elseif event == my_checker.events.healthy then
+--     print(t .. "is now healthy")
+--
+--   elseif event == my_checker.events.unhealthy then
+--     print(t .. "is now unhealthy")
+--
+--   else
+--     print("received an unknown event: " .. event)
+--   end
+-- end
+--
+-- worker_events.register(event_callback, my_checker.EVENT_SOURCE)
 local EVENTS = setmetatable({}, {
   __index = function(self, key)
     error(("'%s' is not a valid event name"):format(tostring(key)))
   end
 })
 for _, event in ipairs({
-  -- "add", -- no 'add'because adding will result in `(un)healthy` events
   "remove",
   "healthy",
   "unhealthy",
@@ -75,64 +125,7 @@ local function dump(...) print(require("pl.pretty").write({...})) end
 local _M = {}
 
 
---[[
-
-* Each worker will instance of the checker
-* They will two timer loops, `healthy_callback` and `unhealthy_callback`
-  * typically, unhealthy runs faster than healthy
-    (especially on passive checks: healthy comes from normal traffic, unhealthy needs checks to get upstream back to healthy status)
-* When a status changes, we want workers to be notified as soon as possible
-  * We don't want to rely on the two `healthy_callback` and `unhealthy_callback` above for that
-  * A worker will determine that a status has changed
-    * Health management functions (report_*) will determine a status change based on fall and rise strategies, and post an event via worker-events
-      * Those functions can be called by the periodic callbacks, or directly (in the case of passive checks)
-      * Those functions are the only ones that lock and update the occurrence counters
-* Provide a convenience method to register a callback that listens on the worker-events status change event
-  * This keeps the worker-events dependency internal to the healthcheck library
-
-Event handling
-
-Where do we register callbacks? here, or in for example resty-worker-events
-  - callback vs. publish-subscribe
-  - ensure a callback runs only once vs. broadcast-style callbacks for all workers
-
-on_local_status_change == on_status_change(false, ...)
-on_status_change == on_status_change(true, ...)
-
-  checker:on_local_status_change(is_broadcast, function(ip, port, status)
-    -- do something on the balancer
-  end)
-
-  checker:on_status_change(is_broadcast, function(ip, port, status)
-    -- do something on the balancer
-  end)
-
-event in a node
-  -> on_status_change(false)
-  -> on_status_change(true)
-
-received event from another node
-  -> on_status_change(true)
-
-Timer management:
-  - fully internal
-  - 2 timers, one for healthy, one for unhealthy
-  - using lock mechanism from upstream-healthcheck library to ensure independence
-  - GC-able timers, or manual timer-stopping ==> to be tested! overall GC,
-    because the event library may also hold on to the healthchecker objects
-
-
-SHM storage
- - data types:
-    - list of targets + healthcheck 'execution' data
-    - individual health data per target
- - for now serialize as json in shm
-
---]]
-
-
-
--- Non-performing serialization for now...
+-- TODO: improve serialization speed
 -- serialize a table to a string
 local function serialize(t)
   return cjson.encode(t)
@@ -160,7 +153,7 @@ local checker = {}
 
 
 -- @return the target list from the shm, an empty table if not found, or
--- nil+error upon a failure
+-- `nil + error` upon a failure
 local function fetch_target_list(self)
   local target_list, err = self.shm:get(self.TARGET_LIST)
   if err then
@@ -173,7 +166,7 @@ end
 
 --- Run the given function holding a lock on the target list.
 -- WARNING: the callback will run unprotected, so it should never
--- throw an error, but always return nil+error instead.
+-- throw an error, but always return `nil + error` instead.
 -- @param self The checker object
 -- @param fn The function to execute
 -- @return The results of the function; or nil and an error message
@@ -216,14 +209,15 @@ end
 
 
 --- Add a target to the healthchecker.
--- When the ip+port combination already exists, it will simply return success
--- (without updating the `hostname` and/or the `healthy` status).
--- @param ip ip-address of the target to check
--- @param port the port to check against
--- @param hostname Hostname to use in the the HTTP request.
+-- When the ip + port combination already exists, it will simply return success
+-- (without updating either `hostname` nor `healthy` status).
+-- @param ip IP address of the target to check.
+-- @param port the port to check against.
+-- @param hostname (optional) hostname to set as the host header in the the
+-- HTTP probe request (defaults to the provided IP address).
 -- @param healthy (optional) a boolean value indicating the initial state,
--- default is true
--- @return true on success, nil+err on failure
+-- default is `true`.
+-- @return `true` on success, or `nil + error` on failure.
 function checker:add_target(ip, port, hostname, healthy)
   ip = tostring(assert(ip, "no ip address provided"))
   port = assert(tonumber(port), "no port number provided")
@@ -283,9 +277,9 @@ end
 
 --- Remove a target from the healthchecker.
 -- The target not existing is not considered an error.
--- @param ip ip-address of the target being checked
--- @param port the port being checked against
--- @return true on success, nil+err on failure
+-- @param ip IP address of the target being checked.
+-- @param port the port being checked against.
+-- @return `true` on success, or `nil + error` on failure.
 function checker:remove_target(ip, port)
   ip   = tostring(assert(ip, "no ip address provided"))
   port = assert(tonumber(port), "no port number provided")
@@ -331,10 +325,10 @@ function checker:remove_target(ip, port)
 end
 
 
---- Gets the current status of the target
--- @param ip ip-address of the target being checked
--- @param port the port being checked against
--- @return `true` if healthy, `false` if unhealthy, or nil+error on failure
+--- Get the current status of the target.
+-- @param ip IP address of the target being checked.
+-- @param port the port being checked against.
+-- @return `true` if healthy, `false` if unhealthy, or `nil + error` on failure.
 function checker:get_target_status(ip, port)
 
   local target = (self.targets[ip] or EMPTY)[tonumber(port)]
@@ -349,9 +343,9 @@ end
 --- Sets the current status of the target.
 -- This will immediately set the status, it will not count against
 -- failure/success count.
--- @param ip ip-address of the target being checked
+-- @param ip IP address of the target being checked
 -- @param port the port being checked against
--- @return `true` on success, or nil+error on failure
+-- @return `true` on success, or `nil + error` on failure
 function checker:set_target_status(ip, port, enabled)
   -- What is this function setting? it should not set the status but the "status-info"
   -- that defines wheter it is up/down.
@@ -388,9 +382,9 @@ end
 ------------------------------------------------------------------------------
 
 
---- Run the given function holding a lock on the target.
+-- Run the given function holding a lock on the target.
 -- WARNING: the callback will run unprotected, so it should never
--- throw an error, but always return nil+error instead.
+-- throw an error, but always return `nil + error` instead.
 -- @param self The checker object
 -- @param ip Target IP
 -- @param port Target port
@@ -424,14 +418,14 @@ local function locking_target(self, ip, port, fn)
 end
 
 
---- Return the value 1 for the counter at `idx` in a multi-counter.
+-- Return the value 1 for the counter at `idx` in a multi-counter.
 -- @param idx The shift index specifying which counter to use.
 -- @return The value 1 encoded for the 32-bit multi-counter.
 local function ctr_unit(idx)
    return bit.lshift(1, idx)
 end
 
---- Extract the value of the counter at `idx` from multi-counter `val`.
+-- Extract the value of the counter at `idx` from multi-counter `val`.
 -- @param val A 32-bit multi-counter holding 4 values.
 -- @param idx The shift index specifying which counter to get.
 -- @return The 8-bit value extracted from the 32-bit multi-counter.
@@ -440,7 +434,7 @@ local function ctr_get(val, idx)
 end
 
 
---- Increment the healthy or unhealthy counter. If the threshold of occurrences
+-- Increment the healthy or unhealthy counter. If the threshold of occurrences
 -- is reached, it changes the status of the target in the shm and posts an
 -- event.
 -- @param self The checker object
@@ -512,11 +506,11 @@ end
 --- Report a health failure.
 -- Reports a health failure which will count against the number of occurrences
 -- required to make a target "fall". The type of healthchecker,
--- "tcp" or "http" determines against which counter the occurence goes.
--- @param ip ip-address of the target being checked
--- @param port the port being checked against
--- @param check (optional) the type of check, either "passive" or "active", default "passive"
--- @return `true` on success, or nil+error on failure
+-- "tcp" or "http" (see `new`) determines against which counter the occurence goes.
+-- @param ip IP address of the target being checked.
+-- @param port the port being checked against.
+-- @param check (optional) the type of check, either "passive" or "active", default "passive".
+-- @return `true` on success, or `nil + error` on failure.
 function checker:report_failure(ip, port, check)
 
   local checks = self.checks[check or "passive"]
@@ -537,10 +531,10 @@ end
 --- Report a health success.
 -- Reports a health success which will count against the number of occurrences
 -- required to make a target "rise".
--- @param ip ip-address of the target being checked
--- @param port the port being checked against
--- @param check (optional) the type of check, either "passive" or "active", default "passive"
--- @return `true` on success, or nil+error on failure
+-- @param ip IP address of the target being checked.
+-- @param port the port being checked against.
+-- @param check (optional) the type of check, either "passive" or "active", default "passive".
+-- @return `true` on success, or `nil + error` on failure.
 function checker:report_success(ip, port, check)
 
   local limit = self.checks[check or "passive"].healthy.successes
@@ -553,11 +547,11 @@ end
 --- Report a http response code.
 -- How the code is interpreted is based on the configuration for healthy and
 -- unhealthy statuses. If it is in neither strategy, it will be ignored.
--- @param ip ip-address of the target being checked
--- @param port the port being checked against
--- @param http_status the http statuscode, or nil to report an invalid http response
--- @param check (optional) the type of check, either "passive" or "active", default "passive"
--- @return `true` on success, or nil+error on failure
+-- @param ip IP address of the target being checked.
+-- @param port the port being checked against.
+-- @param http_status the http statuscode, or nil to report an invalid http response.
+-- @param check (optional) the type of check, either "passive" or "active", default "passive".
+-- @return `true` on success, or `nil + error` on failure.
 function checker:report_http_status(ip, port, http_status, check)
   http_status = tonumber(http_status) or 0
 
@@ -579,15 +573,16 @@ function checker:report_http_status(ip, port, http_status, check)
 
 end
 
---- Report a failure on TCP level
--- @param ip ip-address of the target being checked
--- @param port the port being checked against
+--- Report a failure on TCP level.
+-- @param ip IP address of the target being checked.
+-- @param port the port being checked against.
 -- @param operation The socket operation that failed:
 -- "connect", "send" or "receive".
 -- TODO check what kind of information we get from the OpenResty layer
 -- in order to tell these error conditions apart
 -- https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/balancer.md#get_last_failure
--- @param check (optional) the type of check, either "passive" or "active", default "passive"
+-- @param check (optional) the type of check, either "passive" or "active", default "passive".
+-- @return `true` on success, or `nil + error` on failure.
 function checker:report_tcp_failure(ip, port, operation, check)
 
   local limit = self.checks[check or "passive"].unhealthy.tcp_failures
@@ -600,9 +595,10 @@ end
 
 
 --- Report a timeout failure.
--- @param ip ip-address of the target being checked
--- @param port the port being checked against
--- @param check (optional) the type of check, either "passive" or "active", default "passive"
+-- @param ip IP address of the target being checked.
+-- @param port the port being checked against.
+-- @param check (optional) the type of check, either "passive" or "active", default "passive".
+-- @return `true` on success, or `nil + error` on failure.
 function checker:report_timeout(ip, port, check)
 
   local limit = self.checks[check or "passive"].unhealthy.timeouts
@@ -740,7 +736,7 @@ end
 
 -- @param health_mode either "healthy" or "unhealthy" to indicate what
 -- lock to get.
--- @return true on success, or false if the lock was not acquired, or nil+err
+-- @return `true` on success, or false if the lock was not acquired, or `nil + error`
 -- in case of errors
 function checker:get_periodic_lock(health_mode)
   local key = self.PERIODIC_LOCK .. health_mode
@@ -890,9 +886,12 @@ end
 
 
 --- Stop the background health checks.
+-- The timers will be flagged to exit, but will not exit immediately. Only
+-- after the current timers have expired they will be marked as stopped.
+--
 -- WARNING: only call this method before letting it go.
 -- You cannot temporarily stop and restart it currently!
--- @return true
+-- @return `true`
 function checker:stop()
   self.stopping = true
   -- unregister event handler, to be eligible for GC
@@ -907,8 +906,8 @@ function checker:stop()
 end
 
 
---- Starts the background health checks.
--- @return true or nil+error
+--- Start the background health checks.
+-- @return `true`, or `nil + error`.
 function checker:start()
   if self.timer_count ~= 0 then
     return nil, "cannot start, " .. self.timer_count .. " (of 2) timers are still running"
@@ -1036,7 +1035,7 @@ end
 -- * `checks.passive.unhealthy.tcp_failures`: number of TCP failures to consider a target unhealthy
 -- * `checks.passive.unhealthy.timeouts`: number of timeouts to consider a target unhealthy
 -- * `checks.passive.unhealthy.http_failures`: number of HTTP failures to consider a target unhealthy
--- @return checker object, or nil + error
+-- @return checker object, or `nil + error`
 function _M.new(opts)
 
   assert(worker_events.configured(), "please configure the " ..

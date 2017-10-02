@@ -62,8 +62,10 @@ This library supports performing active and passive health checks on arbitrary h
 Control of the library happens via its programmatic API. Consumption of its events
 happens via the [lua-resty-worker-events](https://github.com/Mashape/lua-resty-worker-events) library.
 
-For active health checks, targets are added using `checker:add_target(host, port)`.
+Targets are added using `checker:add_target(host, port)`.
 Changes in status ("healthy" or "unhealthy") are broadcasted via worker-events.
+
+Active checks are executed in the background based on the specified timer intervals.
 
 For passive health checks, the library receives explicit notifications via its
 programmatic API using functions such as `checker:report_http_status(host, port, status)`.

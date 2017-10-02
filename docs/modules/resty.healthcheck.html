@@ -32,6 +32,7 @@
 
 <h2>Contents</h2>
 <ul>
+<li><a href="#Tables">Tables</a></li>
 <li><a href="#Node_management">Node management </a></li>
 <li><a href="#Health_management">Health management </a></li>
 <li><a href="#Initializing">Initializing </a></li>
@@ -56,6 +57,23 @@
 <p>Healthcheck library for OpenResty.</p>
 <p>
 
+
+<p> Some notes on the usage of this library:</p>
+
+<ul>
+    <li><p>Each target will have 4 counters, 1 success counter and 3 failure
+    counters ('http', 'tcp', and 'timeout'). Any failure will <em>only</em> reset the
+    success counter, but a success will reset <em>all three</em> failure counters.</p></li>
+    <li><p>All targets are uniquely identified by their IP address and port number
+    combination, most functions take those as arguments.</p></li>
+    <li><p>All keys in the SHM will be namespaced by the healthchecker name as
+    provided to the <a href="../modules/resty.healthcheck.html#new">new</a> function. Hence no collissions will occur on shm-keys
+    as long as the <code>name</code> is unique.</p></li>
+    <li><p>Active healthchecks will be synchronized across workers, such that only
+    a single active healthcheck runs. </p></li>
+    <li><p>Events will be raised in every worker, see <a href="https://github.com/Mashape/lua-resty-worker-events">lua-resty-worker-events</a>
+    for details.</p></li>
+</ul>
 </p>
     <h3>Info:</h3>
     <ul>
@@ -65,6 +83,13 @@
     </ul>
 
 
+<h2><a href="#Tables">Tables</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#checker.events">checker.events</a></td>
+	<td class="summary">The list of potential events generated.</td>
+	</tr>
+</table>
 <h2><a href="#Node_management">Node management </a></h2>
 <table class="function_list">
 	<tr>
@@ -73,7 +98,7 @@
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#checker:get_target_status">checker:get_target_status (ip, port)</a></td>
-	<td class="summary">Gets the current status of the target</td>
+	<td class="summary">Get the current status of the target.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#checker:remove_target">checker:remove_target (ip, port)</a></td>
@@ -96,7 +121,7 @@
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#checker:report_tcp_failure">checker:report_tcp_failure (ip, port, operation, check)</a></td>
-	<td class="summary">Report a failure on TCP level</td>
+	<td class="summary">Report a failure on TCP level.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#checker:report_timeout">checker:report_timeout (ip, port, check)</a></td>
@@ -107,7 +132,7 @@
 <table class="function_list">
 	<tr>
 	<td class="name" nowrap><a href="#checker:start">checker:start ()</a></td>
-	<td class="summary">Starts the background health checks.</td>
+	<td class="summary">Start the background health checks.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#checker:stop">checker:stop ()</a></td>
@@ -123,6 +148,65 @@
 <br/>
 
 
+    <h2 class="section-header "><a name="Tables"></a>Tables</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "checker.events"></a>
+    <strong>checker.events</strong>
+    </dt>
+    <dd>
+    The list of potential events generated.
+ The <code>checker.EVENT_SOURCE</code> field can be used to subscribe to the events, see the
+ example below. Each of the events will get a table passed containing
+ the target details <code>ip</code>, <code>port</code>, and <code>hostname</code>.
+ See <a href="https://github.com/Mashape/lua-resty-worker-events">lua-resty-worker-events</a>.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">remove</span>
+         Event raised when a target is removed from the checker.
+        </li>
+        <li><span class="parameter">healthy</span>
+         This event is raised when the target status changed to
+ healthy (and when a target is added as <code>healthy</code>).
+        </li>
+        <li><span class="parameter">unhealthy</span>
+         This event is raised when the target status changed to
+ unhealthy (and when a target is added as <code>unhealthy</code>).
+        </li>
+    </ul>
+
+
+
+
+    <h3>Usage:</h3>
+    <ul>
+        <pre class="example"><span class="comment">-- Register for all events from <code>my_checker</code>
+</span><span class="keyword">local</span> event_callback = <span class="keyword">function</span>(target, event, source, source_PID)
+  <span class="keyword">local</span> t = target.ip .. <span class="string">":"</span> .. target.port ..<span class="string">" by name '"</span> ..
+            target.hostname .. <span class="string">"' "</span>)
+
+  <span class="keyword">if</span> event == my_checker.events.remove <span class="keyword">then</span>
+    <span class="global">print</span>(t .. <span class="string">"has been removed"</span>)
+
+  <span class="keyword">elseif</span> event == my_checker.events.healthy <span class="keyword">then</span>
+    <span class="global">print</span>(t .. <span class="string">"is now healthy"</span>)
+
+  <span class="keyword">elseif</span> event == my_checker.events.unhealthy <span class="keyword">then</span>
+    <span class="global">print</span>(t .. <span class="string">"is now unhealthy"</span>)
+
+  <span class="keyword">else</span>
+    <span class="global">print</span>(<span class="string">"received an unknown event: "</span> .. event)
+  <span class="keyword">end</span>
+<span class="keyword">end</span>
+
+worker_events.register(event_callback, my_checker.EVENT_SOURCE)</pre>
+    </ul>
+
+</dd>
+</dl>
     <h2 class="section-header "><a name="Node_management"></a>Node management </h2>
 
     <dl class="function">
@@ -132,31 +216,32 @@
     </dt>
     <dd>
     Add a target to the healthchecker.
- When the ip+port combination already exists, it will simply return success
- (without updating the <code>hostname</code> and/or the <code>healthy</code> status).
+ When the ip + port combination already exists, it will simply return success
+ (without updating either <code>hostname</code> nor <code>healthy</code> status).
 
 
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">ip</span>
-         ip-address of the target to check
+         IP address of the target to check.
         </li>
         <li><span class="parameter">port</span>
-         the port to check against
+         the port to check against.
         </li>
         <li><span class="parameter">hostname</span>
-         Hostname to use in the the HTTP request.
+         (optional) hostname to set as the host header in the the
+ HTTP probe request (defaults to the provided IP address).
         </li>
         <li><span class="parameter">healthy</span>
          (optional) a boolean value indicating the initial state,
- default is true
+ default is <code>true</code>.
         </li>
     </ul>
 
     <h3>Returns:</h3>
     <ol>
 
-        true on success, nil+err on failure
+        <code>true</code> on success, or <code>nil + error</code> on failure.
     </ol>
 
 
@@ -168,23 +253,23 @@
     <strong>checker:get_target_status (ip, port)</strong>
     </dt>
     <dd>
-    Gets the current status of the target
+    Get the current status of the target.
 
 
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">ip</span>
-         ip-address of the target being checked
+         IP address of the target being checked.
         </li>
         <li><span class="parameter">port</span>
-         the port being checked against
+         the port being checked against.
         </li>
     </ul>
 
     <h3>Returns:</h3>
     <ol>
 
-        <code>true</code> if healthy, <code>false</code> if unhealthy, or nil+error on failure
+        <code>true</code> if healthy, <code>false</code> if unhealthy, or <code>nil + error</code> on failure.
     </ol>
 
 
@@ -203,17 +288,17 @@
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">ip</span>
-         ip-address of the target being checked
+         IP address of the target being checked.
         </li>
         <li><span class="parameter">port</span>
-         the port being checked against
+         the port being checked against.
         </li>
     </ul>
 
     <h3>Returns:</h3>
     <ol>
 
-        true on success, nil+err on failure
+        <code>true</code> on success, or <code>nil + error</code> on failure.
     </ol>
 
 
@@ -235,26 +320,26 @@
     Report a health failure.
  Reports a health failure which will count against the number of occurrences
  required to make a target "fall". The type of healthchecker,
- "tcp" or "http" determines against which counter the occurence goes.
+ "tcp" or "http" (see <a href="../modules/resty.healthcheck.html#new">new</a>) determines against which counter the occurence goes.
 
 
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">ip</span>
-         ip-address of the target being checked
+         IP address of the target being checked.
         </li>
         <li><span class="parameter">port</span>
-         the port being checked against
+         the port being checked against.
         </li>
         <li><span class="parameter">check</span>
-         (optional) the type of check, either "passive" or "active", default "passive"
+         (optional) the type of check, either "passive" or "active", default "passive".
         </li>
     </ul>
 
     <h3>Returns:</h3>
     <ol>
 
-        <code>true</code> on success, or nil+error on failure
+        <code>true</code> on success, or <code>nil + error</code> on failure.
     </ol>
 
 
@@ -274,23 +359,23 @@
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">ip</span>
-         ip-address of the target being checked
+         IP address of the target being checked.
         </li>
         <li><span class="parameter">port</span>
-         the port being checked against
+         the port being checked against.
         </li>
         <li><span class="parameter">http_status</span>
-         the http statuscode, or nil to report an invalid http response
+         the http statuscode, or nil to report an invalid http response.
         </li>
         <li><span class="parameter">check</span>
-         (optional) the type of check, either "passive" or "active", default "passive"
+         (optional) the type of check, either "passive" or "active", default "passive".
         </li>
     </ul>
 
     <h3>Returns:</h3>
     <ol>
 
-        <code>true</code> on success, or nil+error on failure
+        <code>true</code> on success, or <code>nil + error</code> on failure.
     </ol>
 
 
@@ -310,20 +395,20 @@
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">ip</span>
-         ip-address of the target being checked
+         IP address of the target being checked.
         </li>
         <li><span class="parameter">port</span>
-         the port being checked against
+         the port being checked against.
         </li>
         <li><span class="parameter">check</span>
-         (optional) the type of check, either "passive" or "active", default "passive"
+         (optional) the type of check, either "passive" or "active", default "passive".
         </li>
     </ul>
 
     <h3>Returns:</h3>
     <ol>
 
-        <code>true</code> on success, or nil+error on failure
+        <code>true</code> on success, or <code>nil + error</code> on failure.
     </ol>
 
 
@@ -335,16 +420,16 @@
     <strong>checker:report_tcp_failure (ip, port, operation, check)</strong>
     </dt>
     <dd>
-    Report a failure on TCP level
+    Report a failure on TCP level.
 
 
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">ip</span>
-         ip-address of the target being checked
+         IP address of the target being checked.
         </li>
         <li><span class="parameter">port</span>
-         the port being checked against
+         the port being checked against.
         </li>
         <li><span class="parameter">operation</span>
          The socket operation that failed:
@@ -354,10 +439,15 @@
  https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/balancer.md#get<em>last</em>failure
         </li>
         <li><span class="parameter">check</span>
-         (optional) the type of check, either "passive" or "active", default "passive"
+         (optional) the type of check, either "passive" or "active", default "passive".
         </li>
     </ul>
 
+    <h3>Returns:</h3>
+    <ol>
+
+        <code>true</code> on success, or <code>nil + error</code> on failure.
+    </ol>
 
 
 
@@ -374,16 +464,21 @@
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">ip</span>
-         ip-address of the target being checked
+         IP address of the target being checked.
         </li>
         <li><span class="parameter">port</span>
-         the port being checked against
+         the port being checked against.
         </li>
         <li><span class="parameter">check</span>
-         (optional) the type of check, either "passive" or "active", default "passive"
+         (optional) the type of check, either "passive" or "active", default "passive".
         </li>
     </ul>
 
+    <h3>Returns:</h3>
+    <ol>
+
+        <code>true</code> on success, or <code>nil + error</code> on failure.
+    </ol>
 
 
 
@@ -398,14 +493,14 @@
     <strong>checker:start ()</strong>
     </dt>
     <dd>
-    Starts the background health checks.
+    Start the background health checks.
 
 
 
     <h3>Returns:</h3>
     <ol>
 
-        true or nil+error
+        <code>true</code>, or <code>nil + error</code>.
     </ol>
 
 
@@ -418,7 +513,10 @@
     </dt>
     <dd>
     Stop the background health checks.
- WARNING: only call this method before letting it go.
+ The timers will be flagged to exit, but will not exit immediately. Only
+ after the current timers have expired they will be marked as stopped.</p>
+
+<p> WARNING: only call this method before letting it go.
  You cannot temporarily stop and restart it currently!
 
 
@@ -426,7 +524,7 @@
     <h3>Returns:</h3>
     <ol>
 
-        true
+        <code>true</code>
     </ol>
 
 
@@ -477,7 +575,7 @@
     <h3>Returns:</h3>
     <ol>
 
-        checker object, or nil + error
+        checker object, or <code>nil + error</code>
     </ol>
 
 
@@ -491,7 +589,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.6</a></i>
-<i style="float:right;">Last updated 2017-09-29 16:33:08 </i>
+<i style="float:right;">Last updated 2017-10-02 16:26:08 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
