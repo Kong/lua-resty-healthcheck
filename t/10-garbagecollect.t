@@ -62,7 +62,6 @@ qq{
                 }
             })
             assert(checker:add_target("127.0.0.1", 2112, nil, true))
-            --checker:stop(); ngx.sleep(0.5) -- stop and wait for timer exit, should not be necessary!!
             local weak_table = setmetatable({ checker },{
               __mode = "v",
             })

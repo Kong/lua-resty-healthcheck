@@ -807,7 +807,6 @@ local function checker_callback(premature, self, health_mode)
     self.timer_count = self.timer_count - 1
     self:log(ERR, "failed to re-create '", health_mode, "' timer: ", err)
   end
-  self = nil
 end
 
 -- Event handler callback
@@ -896,7 +895,7 @@ function checker:start()
 
   local ok, err
   if self.checks.active.healthy.interval > 0 then
-    ok, err = ngx.timer.at(0, checker_callback, self, "healthy")
+    ok, err = utils.gctimer(0, checker_callback, self, "healthy")
     if not ok then
       return nil, "failed to create 'healthy' timer: " .. err
     end
@@ -904,7 +903,7 @@ function checker:start()
   end
 
   if self.checks.active.unhealthy.interval > 0 then
-    ok, err = ngx.timer.at(0, checker_callback, self, "unhealthy")
+    ok, err = utils.gctimer(0, checker_callback, self, "unhealthy")
     if not ok then
       return nil, "failed to create 'unhealthy' timer: " .. err
     end
