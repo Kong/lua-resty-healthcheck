@@ -758,66 +758,56 @@ function checker:get_periodic_lock(health_mode)
   return true
 end
 
---- Generate an active health check callback function.
--- @param health_mode either "healthy" or "unhealthy" to indicate what
--- callback to generate.
--- @return callback function
-local function make_checker_callback(health_mode)
-  local callback
-  callback = function(premature, self)
-    if premature or self.stopping then
-      self.timer_count = self.timer_count - 1
-      return
-    end
 
-    local interval
-    if not self:get_periodic_lock(health_mode) then
-      -- another worker just ran, or is running the healthcheck
-      interval = self.checks.active[health_mode].interval
-
-    else
-      -- we're elected to run the active healthchecks
-      -- create a list of targets to check, here we can still do this atomically
-      local start_time = ngx_now()
-      local list_to_check = {}
-      local status = (health_mode == "healthy")
-      for _, target in ipairs(self.targets) do
-        if target.healthy == status then
-          list_to_check[#list_to_check + 1] = {
-            ip = target.ip,
-            port = target.port,
-            healthy = target.healthy,
-          }
-        end
-      end
-
-      if not list_to_check[1] then
-        self:log(DEBUG, "checking ", health_mode, " targets: nothing to do")
-      else
-        self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
-        self:active_check_targets(list_to_check)
-      end
-
-      local run_time = ngx_now() - start_time
-      interval = math.max(0, self.checks.active[health_mode].interval - run_time)
-    end
-
-    -- reschedule timer
-    local ok, err = utils.gctimer(interval, callback, self)
-    if not ok then
-      self.timer_count = self.timer_count - 1
-      self:log(ERR, "failed to re-create '", health_mode, "' timer: ", err)
-      return
-    end
+--- Active health check callback function.
+-- @param premature default openresty param
+-- @param self the checker object this timer runs on
+-- @param health_mode either "healthy" or "unhealthy" to indicate what check
+local function checker_callback(premature, self, health_mode)
+  if premature or self.stopping then
+    self.timer_count = self.timer_count - 1
+    return
   end
-  return callback
+
+  local interval
+  if not self:get_periodic_lock(health_mode) then
+    -- another worker just ran, or is running the healthcheck
+    interval = self.checks.active[health_mode].interval
+
+  else
+    -- we're elected to run the active healthchecks
+    -- create a list of targets to check, here we can still do this atomically
+    local start_time = ngx_now()
+    local list_to_check = {}
+    local status = (health_mode == "healthy")
+    for _, target in ipairs(self.targets) do
+      if target.healthy == status then
+        list_to_check[#list_to_check + 1] = {
+          ip = target.ip,
+          port = target.port,
+          healthy = target.healthy,
+        }
+      end
+    end
+
+    if not list_to_check[1] then
+      self:log(DEBUG, "checking ", health_mode, " targets: nothing to do")
+    else
+      self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
+      self:active_check_targets(list_to_check)
+    end
+
+    local run_time = ngx_now() - start_time
+    interval = math.max(0, self.checks.active[health_mode].interval - run_time)
+  end
+
+  -- reschedule timer
+  local ok, err = utils.gctimer(interval, checker_callback, self, health_mode)
+  if not ok then
+    self.timer_count = self.timer_count - 1
+    self:log(ERR, "failed to re-create '", health_mode, "' timer: ", err)
+  end
 end
-
--- Timer callback to check the status of currently HEALTHY targets
-checker.healthy_callback = make_checker_callback("healthy")
-
--- Timer callback to check the status of currently UNHEALTHY targets
-checker.unhealthy_callback = make_checker_callback("unhealthy")
 
 -- Event handler callback
 function checker:event_handler(event_name, ip, port, hostname)
@@ -888,19 +878,9 @@ end
 --- Stop the background health checks.
 -- The timers will be flagged to exit, but will not exit immediately. Only
 -- after the current timers have expired they will be marked as stopped.
---
--- WARNING: only call this method before letting it go.
--- You cannot temporarily stop and restart it currently!
 -- @return `true`
 function checker:stop()
   self.stopping = true
-  -- unregister event handler, to be eligible for GC
-  -- TODO: update worker_events such that unregistering is no longer necessary
-  -- currently stopping the timers will unregister, hence no events will be handled
-  -- and the local list will get out of sync!!!
-  -- Once updated, add a test proving that a running checker can be GC'ed, and
-  -- another to prove that stopped timers still handle events to keep in-sync
-  worker_events.unregister(self.ev_callback, self.EVENT_SOURCE)
   self:log(DEBUG, "timers stopped")
   return true
 end
@@ -915,7 +895,7 @@ function checker:start()
 
   local ok, err
   if self.checks.active.healthy.interval > 0 then
-    ok, err = ngx.timer.at(0, self.healthy_callback, self)
+    ok, err = utils.gctimer(0, checker_callback, self, "healthy")
     if not ok then
       return nil, "failed to create 'healthy' timer: " .. err
     end
@@ -923,7 +903,7 @@ function checker:start()
   end
 
   if self.checks.active.unhealthy.interval > 0 then
-    ok, err = ngx.timer.at(0, self.unhealthy_callback, self)
+    ok, err = utils.gctimer(0, checker_callback, self, "unhealthy")
     if not ok then
       return nil, "failed to create 'unhealthy' timer: " .. err
     end
@@ -931,7 +911,7 @@ function checker:start()
   end
 
   worker_events.unregister(self.ev_callback, self.EVENT_SOURCE)  -- ensure we never double subscribe
-  worker_events.register(self.ev_callback, self.EVENT_SOURCE)
+  worker_events.register_weak(self.ev_callback, self.EVENT_SOURCE)
 
   self.stopping = false  -- do this at the end, so if either creation fails, the other stops also
   self:log(DEBUG, "timers started")
@@ -1013,6 +993,9 @@ end
 
 --- Creates a new health-checker instance.
 -- It will be started upon creation.
+
+-- *NOTE*: the returned `checker` object must be anchored, if not it will be
+-- removed by Lua's garbage collector and the healthchecks will cease to run.
 -- @param opts table with checker options. Options are:
 --
 -- * `name`: name of the health checker
@@ -1089,7 +1072,7 @@ function _M.new(opts)
       -- just a wrapper to be able to access `self` as a closure
       return self:event_handler(event, data.ip, data.port, data.hostname)
     end
-    worker_events.register(self.ev_callback, self.EVENT_SOURCE)
+    worker_events.register_weak(self.ev_callback, self.EVENT_SOURCE)
 
     -- Now load the initial list of targets
     -- all atomic accesses, so we do not need a lock
