@@ -7,7 +7,6 @@
 -- @license Apache 2.0
 
 local timer_at = ngx.timer.at
-local gsub = string.gsub
 
 local _M = {}
 

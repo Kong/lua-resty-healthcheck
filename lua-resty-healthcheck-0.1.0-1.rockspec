@@ -15,6 +15,7 @@ description = {
    homepage = "https://github.com/Mashape/lua-resty-healthcheck"
 }
 dependencies = {
+  "lua-resty-worker-events == 0.3.1",
 }
 build = {
    type = "builtin",
