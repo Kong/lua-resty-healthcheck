@@ -993,7 +993,7 @@ end
 
 --- Creates a new health-checker instance.
 -- It will be started upon creation.
-
+--
 -- *NOTE*: the returned `checker` object must be anchored, if not it will be
 -- removed by Lua's garbage collector and the healthchecks will cease to run.
 -- @param opts table with checker options. Options are:

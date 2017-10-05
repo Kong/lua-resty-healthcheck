@@ -42,6 +42,27 @@ http {
                     }
                 }
             })
+
+            local handler = function(target, eventname, sourcename, pid)
+                ngx.log(ngx.DEBUG,"Event from: ", sourcename)
+                if eventname == checker.events.remove
+                    -- a target was removed
+                    ngx.log(ngx.DEBUG,"Target removed: ",
+                        target.ip, ":", target.port, " ", target.hostname)
+                elseif eventname == checker.events.healthy
+                    -- target changed state, or was added
+                    ngx.log(ngx.DEBUG,"Target switched to healthy: ",
+                        target.ip, ":", target.port, " ", target.hostname)
+                elseif eventname ==  checker.events.unhealthy
+                    -- target changed state, or was added
+                    ngx.log(ngx.DEBUG,"Target switched to unhealthy: ",
+                        target.ip, ":", target.port, " ", target.hostname)
+                else
+                    -- unknown event
+                end
+            end
+            we.register(handler, checker.EVENT_SOURCE)
+
             local ok, err = checker:add_target("127.0.0.1", 2112)
             if not ok then
                 ngx.log(ngx.ERR, err)
