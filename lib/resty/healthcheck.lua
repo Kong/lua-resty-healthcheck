@@ -108,6 +108,7 @@ for _, event in ipairs({
   "remove",
   "healthy",
   "unhealthy",
+  "clear",
 }) do
   EVENTS[event] = event
 end
@@ -304,7 +305,7 @@ function checker:remove_target(ip, port)
     target_list = serialize(target_list)
 
     -- we first write the updated list, and only then remove the health
-    -- status this prevents race conditions when a healthcheker get the
+    -- status this prevents race conditions when a healthchecker gets the
     -- initial state from the shm
     local ok, err = self.shm:set(self.TARGET_LIST, target_list)
     if not ok then
@@ -319,6 +320,41 @@ function checker:remove_target(ip, port)
 
     -- raise event for our removed target
     self:raise_event(self.events.remove, ip, port, target_found.hostname)
+
+    return true
+  end)
+end
+
+
+--- Clear all healthcheck data.
+-- @return `true` on success, or `nil + error` on failure.
+function checker:clear()
+
+  return locking_target_list(self, function(target_list)
+
+    local old_target_list = target_list
+
+    -- go update the shm
+    target_list = serialize({})
+
+    local ok, err = self.shm:set(self.TARGET_LIST, target_list)
+    if not ok then
+      return nil, "failed to store target_list in shm: " .. err
+    end
+
+    -- remove all individual statuses
+    for _, target in ipairs(old_target_list) do
+      local ip, port = target.ip, target.port
+      ok, err = self.shm:set(get_shm_key(self.TARGET_STATUS, ip, port), nil)
+      if not ok then
+        self:log(ERR, "failed to remove health status from shm: ", err)
+      end
+    end
+
+    self.targets = {}
+
+    -- raise event for our removed target
+    self:raise_event(self.events.clear)
 
     return true
   end)
@@ -727,7 +763,7 @@ function checker:active_check_targets(list)
 end
 
 --============================================================================
--- Callbacks, timers and events
+-- Internal callbacks, timers and events
 --============================================================================
 -- The timer callbacks are responsible for checking the status, upon success/
 -- failure they will call the health-management functions to deal with the
@@ -850,6 +886,11 @@ function checker:event_handler(event_name, ip, port, hostname)
                     "' from '", target_found.healthy, "' to '", health, "'")
     target_found.healthy = health
 
+  elseif event_name == self.events.clear then
+    -- clear local cache
+    self.targets = {}
+    self:log(DEBUG, "event: local cache cleared")
+
   else
     self:log(WARN, "event: unknown event received '", event_name, "'")
   end
@@ -917,7 +958,6 @@ function checker:start()
   self:log(DEBUG, "timers started")
   return true
 end
-
 
 
 --============================================================================
@@ -1074,23 +1114,26 @@ function _M.new(opts)
     end
     worker_events.register_weak(self.ev_callback, self.EVENT_SOURCE)
 
-    -- Now load the initial list of targets
-    -- all atomic accesses, so we do not need a lock
-    local err
-    self.targets, err = fetch_target_list(self)
-    if err then
-      return nil, err
-    end
-    self:log(DEBUG, "Got initial target list (", #self.targets, " targets)")
+    -- Lock the list, in case it is being cleared by another worker
+    local ok, err = locking_target_list(self, function(target_list)
 
-    -- load individual statuses
-    for _, target in ipairs(self.targets) do
-      target.healthy = self.shm:get(get_shm_key(self.TARGET_STATUS,
-                                            target.ip, target.port))
-      self:log(DEBUG, "Got initial status ", target.healthy, " ", target.ip, ":", target.port)
-      -- fill-in the hash part for easy lookup
-      self.targets[target.ip] = self.targets[target.ip] or {}
-      self.targets[target.ip][target.port] = target
+      self.targets = target_list
+      self:log(DEBUG, "Got initial target list (", #self.targets, " targets)")
+
+      -- load individual statuses
+      for _, target in ipairs(self.targets) do
+        target.healthy = self.shm:get(get_shm_key(self.TARGET_STATUS,
+                                              target.ip, target.port))
+        self:log(DEBUG, "Got initial status ", target.healthy, " ", target.ip, ":", target.port)
+        -- fill-in the hash part for easy lookup
+        self.targets[target.ip] = self.targets[target.ip] or {}
+        self.targets[target.ip][target.port] = target
+      end
+
+      return true
+    end)
+    if not ok then
+      self:log(ERR, "Error loading initial target list: ", err)
     end
 
     -- handle events to sync up in case there was a change by another worker
