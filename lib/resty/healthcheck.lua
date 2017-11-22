@@ -349,6 +349,14 @@ function checker:clear()
       if not ok then
         self:log(ERR, "failed to remove health status from shm: ", err)
       end
+      ok, err = self.shm:set(get_shm_key(self.TARGET_OKS, ip, port), nil)
+      if not ok then
+        self:log(ERR, "failed to clear health counter from shm: ", err)
+      end
+      ok, err = self.shm:set(get_shm_key(self.TARGET_NOKS, ip, port), nil)
+      if not ok then
+        self:log(ERR, "failed to clear health counter from shm: ", err)
+      end
     end
 
     self.targets = {}
