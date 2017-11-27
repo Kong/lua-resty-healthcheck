@@ -17,7 +17,7 @@
 -- - Active healthchecks will be synchronized across workers, such that only
 -- a single active healthcheck runs.
 --
--- - Events will be raised in every worker, see [lua-resty-worker-events](https://github.com/Mashape/lua-resty-worker-events)
+-- - Events will be raised in every worker, see [lua-resty-worker-events](https://github.com/Kong/lua-resty-worker-events)
 -- for details.
 --
 -- @copyright 2017 Kong Inc.
@@ -72,7 +72,7 @@ local CTR_NAME_SUCCESS = {
 -- The `checker.EVENT_SOURCE` field can be used to subscribe to the events, see the
 -- example below. Each of the events will get a table passed containing
 -- the target details `ip`, `port`, and `hostname`.
--- See [lua-resty-worker-events](https://github.com/Mashape/lua-resty-worker-events).
+-- See [lua-resty-worker-events](https://github.com/Kong/lua-resty-worker-events).
 -- @field remove Event raised when a target is removed from the checker.
 -- @field healthy This event is raised when the target status changed to
 -- healthy (and when a target is added as `healthy`).

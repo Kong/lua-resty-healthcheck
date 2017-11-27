@@ -1,7 +1,7 @@
 --------------------------------------------------------------------------
 -- Utilities used by the healthcheck library.
 --
--- Code originally from https://github.com/Mashape/lua-resty-dns-client
+-- Code originally from https://github.com/Kong/lua-resty-dns-client
 -- @copyright 2017 Kong Inc.
 -- @author Hisham Muhammad, Thijs Schreijer
 -- @license Apache 2.0

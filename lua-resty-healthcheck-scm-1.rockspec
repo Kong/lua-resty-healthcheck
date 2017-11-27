@@ -11,7 +11,7 @@ description = {
       intervals.
    ]],
    license = "Apache 2.0",
-   homepage = "https://github.com/Mashape/lua-resty-healthcheck"
+   homepage = "https://github.com/Kong/lua-resty-healthcheck"
 }
 dependencies = {
   "lua-resty-worker-events == 0.3.1",

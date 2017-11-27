@@ -4,11 +4,11 @@
 
 A health check library for OpenResty.
 
-# Status
+## Status
 
 This library is still under early development.
 
-# Synopsis
+## Synopsis
 
 ```nginx
 http {
@@ -76,12 +76,12 @@ http {
 }
 ```
 
-# Description
+## Description
 
 This library supports performing active and passive health checks on arbitrary hosts.
 
 Control of the library happens via its programmatic API. Consumption of its events
-happens via the [lua-resty-worker-events](https://github.com/Mashape/lua-resty-worker-events) library.
+happens via the [lua-resty-worker-events](https://github.com/Kong/lua-resty-worker-events) library.
 
 Targets are added using `checker:add_target(host, port)`.
 Changes in status ("healthy" or "unhealthy") are broadcasted via worker-events.
@@ -91,12 +91,16 @@ Active checks are executed in the background based on the specified timer interv
 For passive health checks, the library receives explicit notifications via its
 programmatic API using functions such as `checker:report_http_status(host, port, status)`.
 
-See the [online LDoc documentation](http://mashape.github.io/lua-resty-healthcheck)
+See the [online LDoc documentation](http://kong.github.io/lua-resty-healthcheck)
 for the complete API.
 
-# Copyright and License
+## History
 
-## License
+### 0.1.0 (27-Nov-2018) Initial release
+
+  * Initial upload
+
+## Copyright and License
 
 ```
 Copyright 2017 Kong Inc.
@@ -114,5 +118,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-[badge-travis-url]: https://travis-ci.com/Mashape/lua-resty-healthcheck/branches
-[badge-travis-image]: https://travis-ci.com/Mashape/lua-resty-healthcheck.svg?token=cpcsrmGmJZdztxDeoJqq&branch=master
+[badge-travis-url]: https://travis-ci.com/Kong/lua-resty-healthcheck/branches
+[badge-travis-image]: https://travis-ci.com/Kong/lua-resty-healthcheck.svg?token=cpcsrmGmJZdztxDeoJqq&branch=master
