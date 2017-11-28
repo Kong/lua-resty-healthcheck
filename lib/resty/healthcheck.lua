@@ -276,6 +276,26 @@ function checker:add_target(ip, port, hostname, healthy)
 end
 
 
+-- Remove health status entries from an individual target from shm
+-- @param self The checker object
+-- @param ip IP address of the target being checked.
+-- @param port the port being checked against.
+local function clear_target_data_from_shm(self, ip, port)
+    local ok, err = self.shm:set(get_shm_key(self.TARGET_STATUS, ip, port), nil)
+    if not ok then
+      self:log(ERR, "failed to remove health status from shm: ", err)
+    end
+    ok, err = self.shm:set(get_shm_key(self.TARGET_OKS, ip, port), nil)
+    if not ok then
+      self:log(ERR, "failed to clear health counter from shm: ", err)
+    end
+    ok, err = self.shm:set(get_shm_key(self.TARGET_NOKS, ip, port), nil)
+    if not ok then
+      self:log(ERR, "failed to clear health counter from shm: ", err)
+    end
+end
+
+
 --- Remove a target from the healthchecker.
 -- The target not existing is not considered an error.
 -- @param ip IP address of the target being checked.
@@ -312,11 +332,7 @@ function checker:remove_target(ip, port)
       return nil, "failed to store target_list in shm: " .. err
     end
 
-    -- remove health status from shm
-    ok, err = self.shm:set(get_shm_key(self.TARGET_STATUS, ip, port), nil)
-    if not ok then
-      self:log(ERR, "failed to remove health status from shm: ", err)
-    end
+    clear_target_data_from_shm(self, ip, port)
 
     -- raise event for our removed target
     self:raise_event(self.events.remove, ip, port, target_found.hostname)
@@ -345,18 +361,7 @@ function checker:clear()
     -- remove all individual statuses
     for _, target in ipairs(old_target_list) do
       local ip, port = target.ip, target.port
-      ok, err = self.shm:set(get_shm_key(self.TARGET_STATUS, ip, port), nil)
-      if not ok then
-        self:log(ERR, "failed to remove health status from shm: ", err)
-      end
-      ok, err = self.shm:set(get_shm_key(self.TARGET_OKS, ip, port), nil)
-      if not ok then
-        self:log(ERR, "failed to clear health counter from shm: ", err)
-      end
-      ok, err = self.shm:set(get_shm_key(self.TARGET_NOKS, ip, port), nil)
-      if not ok then
-        self:log(ERR, "failed to clear health counter from shm: ", err)
-      end
+      clear_target_data_from_shm(self, ip, port)
     end
 
     self.targets = {}
@@ -595,7 +600,8 @@ end
 -- @param port the port being checked against.
 -- @param http_status the http statuscode, or nil to report an invalid http response.
 -- @param check (optional) the type of check, either "passive" or "active", default "passive".
--- @return `true` on success, or `nil + error` on failure.
+-- @return `true` on success, `nil` if the status was ignored (not in active or
+-- passive health check lists) or `nil + error` on failure.
 function checker:report_http_status(ip, port, http_status, check)
   http_status = tonumber(http_status) or 0
 
@@ -1085,7 +1091,7 @@ function _M.new(opts)
   -- other properties
   self.targets = nil     -- list of targets, initially loaded, maintained by events
   self.events = nil      -- hash table with supported events (prevent magic strings)
-  self.stopping = true   -- flag to idicate to timers to stop checking
+  self.stopping = true   -- flag to indicate to timers to stop checking
   self.timer_count = 0   -- number of running timers
   self.ev_callback = nil -- callback closure per checker instance
 
