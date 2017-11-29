@@ -258,15 +258,14 @@ function checker:add_target(ip, port, hostname, healthy)
       return nil, "failed to store target_list in shm: " .. err
     end
 
-    return true
-  end)
-
-  if ok then
     -- raise event for our newly added target
     local event = healthy and "healthy" or "unhealthy"
     self:raise_event(self.events[event], ip, port, hostname)
+
     return true
-  elseif ok == false then
+  end)
+
+  if ok == false then
     -- the target already existed, no event, but still success
     return true
   end
