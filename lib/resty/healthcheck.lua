@@ -387,41 +387,6 @@ function checker:get_target_status(ip, port)
 
 end
 
---[[ (not for the first iteration)
---- Sets the current status of the target.
--- This will immediately set the status, it will not count against
--- failure/success count.
--- @param ip IP address of the target being checked
--- @param port the port being checked against
--- @return `true` on success, or `nil + error` on failure
-function checker:set_target_status(ip, port, enabled)
-  -- What is this function setting? it should not set the status but the "status-info"
-  -- that defines wheter it is up/down.
-  -- Eg. 100 successes in a row, then we call this to set it down anyway.
-  -- The next healthcheck is a success. Now what is going to happen?
-
-  -- OPTION: if status is set to `false` then it is marked `down` and
-  -- excluded from the healthchecks (or any other health info from the
-  -- health management functions). If status is set to `true` it will be checked
-  -- and health info will be collected
-
-  -- OPTION: Will mark a node as down, and keep it down, indepedent of received health data.
-  -- When the change to down is a change in status, an event will be sent.
-  -- While down healthchecks will continue, but not influence the state.
-  -- When reenabling the checks, the last state, according to the last health data
-  -- receieved (during the time the node was forcefully down) will detrmine the new status
-
-  -- OPTION: if status is set to `false` then it is marked `disabled` and
-  -- healthchecks keep going but do not report events. If status is set to `true`
-  -- it will start reporting status changes again. Also reports a `enabled`/`disabled` event.
-
-
-  -- TODO: implement
-
-end
-]]
-
-
 
 ------------------------------------------------------------------------------
 -- Health management.
@@ -656,6 +621,55 @@ function checker:report_timeout(ip, port, check)
 
 end
 
+
+--- Sets the current status of the target.
+-- This will immediately set the status and clear its counters.
+-- @param ip IP address of the target being checked
+-- @param port the port being checked against
+-- @param mode boolean: `true` for healthy, `false` for unhealthy
+-- @return `true` on success, or `nil + error` on failure
+function checker:set_target_status(ip, port, mode)
+  ip   = tostring(assert(ip, "no ip address provided"))
+  port = assert(tonumber(port), "no port number provided")
+  assert(type(mode) == "boolean")
+
+  local health_mode = mode and "healthy" or "unhealthy"
+
+  port = tonumber(port)
+  local target = (self.targets[ip] or EMPTY)[port]
+  if not target then
+    -- sync issue: warn, but return success
+    self:log(WARN, "trying to increment a target that is not in the list: ", ip, ":", port)
+    return true
+  end
+
+  local oks_key = get_shm_key(self.TARGET_OKS, ip, port)
+  local noks_key = get_shm_key(self.TARGET_NOKS, ip, port)
+
+  local ok, err = locking_target(self, ip, port, function()
+
+    local _, err = self.shm:set(oks_key, 0)
+    if err then
+      return nil, err
+    end
+    local _, err = self.shm:set(noks_key, 0)
+    if err then
+      return nil, err
+    end
+
+    local status_key = get_shm_key(self.TARGET_STATUS, ip, port)
+    self.shm:set(status_key, health_mode == "healthy")
+    self:raise_event(self.events[health_mode], ip, port, target.hostname)
+
+    return true
+
+  end)
+
+  if ok then
+    self:log(WARN, health_mode, " forced for ", ip, ":", port)
+  end
+  return ok, err
+end
 
 
 --============================================================================
