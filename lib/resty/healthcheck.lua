@@ -635,16 +635,16 @@ function checker:set_target_status(ip, port, mode)
 
   local health_mode = mode and "healthy" or "unhealthy"
 
-  port = tonumber(port)
   local target = (self.targets[ip] or EMPTY)[port]
   if not target then
     -- sync issue: warn, but return success
-    self:log(WARN, "trying to increment a target that is not in the list: ", ip, ":", port)
+    self:log(WARN, "trying to set status for a target that is not in the list: ", ip, ":", port)
     return true
   end
 
   local oks_key = get_shm_key(self.TARGET_OKS, ip, port)
   local noks_key = get_shm_key(self.TARGET_NOKS, ip, port)
+  local status_key = get_shm_key(self.TARGET_STATUS, ip, port)
 
   local ok, err = locking_target(self, ip, port, function()
 
@@ -652,13 +652,17 @@ function checker:set_target_status(ip, port, mode)
     if err then
       return nil, err
     end
+
     local _, err = self.shm:set(noks_key, 0)
     if err then
       return nil, err
     end
 
-    local status_key = get_shm_key(self.TARGET_STATUS, ip, port)
     self.shm:set(status_key, health_mode == "healthy")
+    if err then
+      return nil, err
+    end
+
     self:raise_event(self.events[health_mode], ip, port, target.hostname)
 
     return true
