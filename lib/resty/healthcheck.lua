@@ -460,6 +460,11 @@ end
 -- @return True if succeeded, or nil and an error message.
 local function incr_counter(self, health_mode, ip, port, limit, ctr_type)
 
+  -- fail fast on counters that are disabled by configuration
+  if limit == 0 then
+    return true
+  end
+
   port = tonumber(port)
   local target = (self.targets[ip] or EMPTY)[port]
   if not target then
