@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * (blocks() * 11);
+plan tests => repeat_each() * (blocks() * 11) - 1;
 
 my $pwd = cwd();
 
@@ -163,6 +163,82 @@ false
 --- error_log
 checking healthy targets: nothing to do
 checking unhealthy targets: nothing to do
+unhealthy TCP increment (1/2) for 127.0.0.1:2112
+unhealthy TCP increment (2/2) for 127.0.0.1:2112
+event: target status '127.0.0.1:2112' from 'true' to 'false'
+unhealthy TCP increment (1/2) for 127.0.0.1:2113
+unhealthy TCP increment (2/2) for 127.0.0.1:2113
+event: target status '127.0.0.1:2113' from 'true' to 'false'
+
+
+=== TEST 3: report_failure() is a nop when failure counters == 0
+--- http_config eval
+qq{
+    $::HttpConfig
+
+    server {
+        listen 2112;
+        location = /status {
+            return 200;
+        }
+    }
+}
+--- config
+    location = /t {
+        content_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+            local checker = healthcheck.new({
+                name = "testing",
+                shm_name = "test_shm",
+                type = "tcp",
+                checks = {
+                    active = {
+                        http_path = "/status",
+                        healthy  = {
+                            interval = 999, -- we don't want active checks
+                            successes = 3,
+                        },
+                        unhealthy  = {
+                            interval = 999, -- we don't want active checks
+                            tcp_failures = 0,
+                            http_failures = 0,
+                        }
+                    },
+                    passive = {
+                        healthy  = {
+                            successes = 3,
+                        },
+                        unhealthy  = {
+                            tcp_failures = 0,
+                            http_failures = 0,
+                        }
+                    }
+                }
+            })
+            ngx.sleep(0.1) -- wait for initial timers to run once
+            local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
+            checker:report_failure("127.0.0.1", 2112, "active")
+            checker:report_failure("127.0.0.1", 2113, "passive")
+            checker:report_failure("127.0.0.1", 2112, "active")
+            checker:report_failure("127.0.0.1", 2113, "passive")
+            checker:report_failure("127.0.0.1", 2112, "active")
+            checker:report_failure("127.0.0.1", 2113, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
+            ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- true
+        }
+    }
+--- request
+GET /t
+--- response_body
+true
+true
+--- error_log
+checking healthy targets: nothing to do
+checking unhealthy targets: nothing to do
+--- no_error_log
 unhealthy TCP increment (1/2) for 127.0.0.1:2112
 unhealthy TCP increment (2/2) for 127.0.0.1:2112
 event: target status '127.0.0.1:2112' from 'true' to 'false'
