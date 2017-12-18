@@ -270,7 +270,7 @@ function checker:add_target(ip, port, hostname, healthy)
     return true
   end
 
-  return nil, err
+  return ok, err
 
 end
 
