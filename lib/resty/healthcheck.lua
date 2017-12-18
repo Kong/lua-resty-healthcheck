@@ -115,7 +115,7 @@ end
 
 
 -- Some color for demo purposes
-local use_color = true
+local use_color = false
 local function green(str) return use_color and ("\027[32m" .. str .. "\027[0m") or str end
 local function red(str) return use_color and ("\027[31m" .. str .. "\027[0m") or str end
 local function worker_color(str) return use_color and ("\027["..tostring(31 + ngx.worker.pid() % 5).."m"..str.."\027[0m") or str end
