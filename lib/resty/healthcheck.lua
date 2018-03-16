@@ -1040,9 +1040,13 @@ local function fill_in_settings(opts, defaults, ctx)
 
     if v then
       if type(v) == "table" then
-        ctx[#ctx + 1] = k
-        obj[k] = fill_in_settings(v, default, ctx)
-        ctx[#ctx + 1] = nil
+        if default[1] then -- do not recurse on arrays
+          obj[k] = v
+        else
+          ctx[#ctx + 1] = k
+          obj[k] = fill_in_settings(v, default, ctx)
+          ctx[#ctx + 1] = nil
+        end
       else
         if type(v) == "number" and (v < 0 or v > MAXNUM) then
           fail(ctx, k, "must be between 0 and " .. MAXNUM)
