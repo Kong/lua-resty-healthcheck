@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * (blocks() * 3) - 1;
+plan tests => repeat_each() * (blocks() * 3) - 2;
 
 my $pwd = cwd();
 
@@ -154,3 +154,77 @@ true
 true
 false
 
+=== TEST 7: new() deals with bad inputs
+--- http_config eval: $::HttpConfig
+--- config
+    location = /t {
+        content_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+
+            -- tests for failure
+            local tests = {
+                { active = { timeout = -1 }},
+                { active = { timeout = 1e+42 }},
+                { active = { concurrency = -1 }},
+                { active = { concurrency = 1e42 }},
+                { active = { healthy = { interval = -1 }}},
+                { active = { healthy = { interval = 1e42 }}},
+                { active = { healthy = { successes = -1 }}},
+                { active = { healthy = { successes = 1e42 }}},
+                { active = { unhealthy = { interval = -1 }}},
+                { active = { unhealthy = { interval = 1e42 }}},
+                { active = { unhealthy = { tcp_failures = -1 }}},
+                { active = { unhealthy = { tcp_failures = 1e42 }}},
+                { active = { unhealthy = { timeouts = -1 }}},
+                { active = { unhealthy = { timeouts = 1e42 }}},
+                { active = { unhealthy = { http_failures = -1 }}},
+                { active = { unhealthy = { http_failures = 1e42 }}},
+                { passive = { healthy = { successes = -1 }}},
+                { passive = { healthy = { successes = 1e42 }}},
+                { passive = { unhealthy = { tcp_failures = -1 }}},
+                { passive = { unhealthy = { tcp_failures = 1e42 }}},
+                { passive = { unhealthy = { timeouts = -1 }}},
+                { passive = { unhealthy = { timeouts = 1e42 }}},
+                { passive = { unhealthy = { http_failures = -1 }}},
+                { passive = { unhealthy = { http_failures = 1e42 }}},
+            }
+            for _, test in ipairs(tests) do
+                local ok, err = pcall(healthcheck.new, {
+                    name = "testing",
+                    shm_name = "test_shm",
+                    type = "http",
+                    checks = test,
+                })
+                ngx.say(ok)
+            end
+        }
+    }
+--- request
+GET /t
+--- response_body
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
+false
