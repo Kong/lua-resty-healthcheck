@@ -1016,17 +1016,43 @@ end
 
 
 local NO_DEFAULT = {}
+local MAXNUM = 2^31 - 1
 
 
-local function fill_in_settings(opts, defaults)
+local function fail(ctx, k, msg)
+  ctx[#ctx + 1] = k
+  error(table.concat(ctx, ".") .. ": " .. msg, #ctx + 1)
+end
+
+
+local function fill_in_settings(opts, defaults, ctx)
+  ctx = ctx or {}
   local obj = {}
   for k, default in pairs(defaults) do
-    local v = opts[k] or default
-    if type(v) == "table" then
-      obj[k] = v ~= NO_DEFAULT and fill_in_settings(v, default)
-    else
-      obj[k] = v
+    local v = opts[k]
+
+    -- basic type-check of configuration
+    if default ~= NO_DEFAULT
+       and v ~= nil
+       and type(v) ~= type(default) then
+      fail(ctx, k, "invalid value")
     end
+
+    if v then
+      if type(v) == "table" then
+        ctx[#ctx + 1] = k
+        obj[k] = fill_in_settings(v, default, ctx)
+        ctx[#ctx + 1] = nil
+      else
+        if type(v) == "number" and (v < 0 or v > MAXNUM) then
+          fail(ctx, k, "must be between 0 and " .. MAXNUM)
+        end
+        obj[k] = v
+      end
+    elseif default ~= NO_DEFAULT then
+      obj[k] = default
+    end
+
   end
   return obj
 end
