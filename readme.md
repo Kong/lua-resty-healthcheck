@@ -96,9 +96,17 @@ for the complete API.
 
 ## History
 
-### 0.1.0 (27-Nov-2018) Initial release
+### 0.3.0 (18-Dec-2017)
 
-  * Initial upload
+ * Disable individual checks by setting their counters to 0
+
+### 0.2.0 (30-Nov-2017)
+
+ * Adds `set_target_status"
+
+### 0.1.0 (27-Nov-2017) Initial release
+
+ * Initial upload
 
 ## Copyright and License
 
