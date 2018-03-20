@@ -96,6 +96,11 @@ for the complete API.
 
 ## History
 
+### 0.4.0 (20-Mar-2017)
+
+ * Correct setting of defaults in `http_statuses`
+ * Type and bounds checking to `checks` table
+
 ### 0.3.0 (18-Dec-2017)
 
  * Disable individual checks by setting their counters to 0
