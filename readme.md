@@ -107,7 +107,7 @@ for the complete API.
 
 ### 0.2.0 (30-Nov-2017)
 
- * Adds `set_target_status"
+ * Adds `set_target_status`
 
 ### 0.1.0 (27-Nov-2017) Initial release
 
