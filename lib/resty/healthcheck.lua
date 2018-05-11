@@ -474,7 +474,8 @@ local function incr_counter(self, health_mode, ip, port, limit, ctr_type)
     return true
   end
 
-  if (health_mode == "healthy" and target.healthy) or
+  local nokCounter = self.shm:get(get_shm_key(self.TARGET_NOKS, ip, port));
+  if (health_mode == "healthy" and target.healthy and (not nokCounter or nokCounter == 0)) or
      (health_mode == "unhealthy" and not target.healthy) then
     -- No need to count successes when healthy or failures when unhealthy
     return true
