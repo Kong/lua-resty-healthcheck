@@ -703,7 +703,7 @@ end
 -- Runs a single healthcheck probe
 function checker:run_single_check(ip, port, hostname, healthy)
 
-  self:log(DEBUG, "Checking ", ip, ":", port, " (currently ", healthy and green("healthy") or red("unhealthy"), ")")
+  self:log(DEBUG, "Checking ", ip, ":", port, " host: [", hostname, "]", " (currently ", healthy and green("healthy") or red("unhealthy"), ")")
 
   local sock, err = ngx.socket.tcp()
   if not sock then
@@ -731,7 +731,21 @@ function checker:run_single_check(ip, port, hostname, healthy)
   -- TODO: implement https
 
   local path = self.checks.active.http_path
-  local request = ("GET %s HTTP/1.0\r\nHost: %s\r\n\r\n"):format(path, hostname)
+  local host = hostname
+
+  if string.sub(path, 1, 7) == "http://" then
+    -- Split absolute path
+    local fslash = string.find(path, "/", 8)
+    if fslash then
+      host = string.sub(path, 8, fslash - 1)
+      path = string.sub(path, fslash, -1)
+    else
+      host = string.sub(path, 8, -1)
+      path = "/"
+  end
+
+  self:log(DEBUG, "request: host: [", host, "] path: [", path, "]  on ip: [", ip, "]")
+  local request = ("GET %s HTTP/1.0\r\nHost: %s\r\n\r\n"):format(path, host)
 
   local bytes
   bytes, err = sock:send(request)
