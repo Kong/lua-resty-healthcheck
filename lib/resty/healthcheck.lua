@@ -51,22 +51,20 @@ local EMPTY = setmetatable({},{
 
 
 -- Counters: a 32-bit shm integer can hold up to four 8-bit counters.
--- Here, we are using three.
-local CTR_HTTP    = 0x000000
-local CTR_TCP     = 0x000100
-local CTR_TIMEOUT = 0x010000
-local CTR_SUCCESS = CTR_HTTP   -- same, but stored in separate shm value
+local CTR_SUCCESS = 0x00000001
+local CTR_HTTP    = 0x00000100
+local CTR_TCP     = 0x00010000
+local CTR_TIMEOUT = 0x01000000
 
-local CTR_NAME_FAILURE = {
+local MASK_FAILURE = 0xffffff00
+local MASK_SUCCESS = 0x000000ff
+
+local COUNTER_NAMES = {
+  [CTR_SUCCESS] = "SUCCESS",
   [CTR_HTTP]    = "HTTP",
   [CTR_TCP]     = "TCP",
   [CTR_TIMEOUT] = "TIMEOUT",
 }
-
-local CTR_NAME_SUCCESS = {
-  [CTR_SUCCESS] = "SUCCESS"
-}
-
 
 --- The list of potential events generated.
 -- The `checker.EVENT_SOURCE` field can be used to subscribe to the events, see the
@@ -78,6 +76,12 @@ local CTR_NAME_SUCCESS = {
 -- healthy (and when a target is added as `healthy`).
 -- @field unhealthy This event is raised when the target status changed to
 -- unhealthy (and when a target is added as `unhealthy`).
+-- @field mostly_healthy This event is raised when the target status is
+-- still healthy but it started to receive "unhealthy" updates via active or
+-- passive checks.
+-- @field mostly_unhealthy This event is raised when the target status is
+-- still unhealthy but it started to receive "healthy" updates via active or
+-- passive checks.
 -- @table checker.events
 -- @usage -- Register for all events from `my_checker`
 -- local event_callback = function(target, event, source, source_PID)
@@ -86,15 +90,10 @@ local CTR_NAME_SUCCESS = {
 --
 --   if event == my_checker.events.remove then
 --     print(t .. "has been removed")
---
 --   elseif event == my_checker.events.healthy then
 --     print(t .. "is now healthy")
---
 --   elseif event == my_checker.events.unhealthy then
 --     print(t .. "is now unhealthy")
---
---   else
---     print("received an unknown event: " .. event)
 --   end
 -- end
 --
@@ -108,17 +107,27 @@ for _, event in ipairs({
   "remove",
   "healthy",
   "unhealthy",
+  "mostly_healthy",
+  "mostly_unhealthy",
   "clear",
 }) do
   EVENTS[event] = event
 end
 
+local INTERNAL_STATES = {}
+for i, key in ipairs({
+  "healthy",
+  "unhealthy",
+  "mostly_healthy",
+  "mostly_unhealthy",
+}) do
+  INTERNAL_STATES[i] = key
+  INTERNAL_STATES[key] = i
+end
 
 -- Some color for demo purposes
 local use_color = false
 local id = function(x) return x end
-local green        = use_color and function(str) return ("\027[32m" .. str .. "\027[0m") end or id
-local red          = use_color and function(str) return ("\027[31m" .. str .. "\027[0m") end or id
 local worker_color = use_color and function(str) return ("\027["..tostring(31 + ngx.worker.pid() % 5).."m"..str.."\027[0m") end or id
 
 -- Debug function
@@ -140,7 +149,7 @@ local function deserialize(s)
 end
 
 
-local function get_shm_key(key_prefix, ip, port)
+local function key_for(key_prefix, ip, port)
   return key_prefix .. ":" .. ip .. ":" .. port
 end
 
@@ -212,21 +221,23 @@ end
 
 --- Add a target to the healthchecker.
 -- When the ip + port combination already exists, it will simply return success
--- (without updating either `hostname` nor `healthy` status).
+-- (without updating neither `hostname` or `is_healthy` status).
 -- @param ip IP address of the target to check.
 -- @param port the port to check against.
 -- @param hostname (optional) hostname to set as the host header in the the
 -- HTTP probe request (defaults to the provided IP address).
--- @param healthy (optional) a boolean value indicating the initial state,
+-- @param is_healthy (optional) a boolean value indicating the initial state,
 -- default is `true`.
 -- @return `true` on success, or `nil + error` on failure.
-function checker:add_target(ip, port, hostname, healthy)
+function checker:add_target(ip, port, hostname, is_healthy)
   ip = tostring(assert(ip, "no ip address provided"))
   port = assert(tonumber(port), "no port number provided")
   hostname = hostname or ip
-  if healthy == nil then
-    healthy = true
+  if is_healthy == nil then
+    is_healthy = true
   end
+
+  local internal_health = is_healthy and "healthy" or "unhealthy"
 
   local ok, err = locking_target_list(self, function(target_list)
 
@@ -238,10 +249,11 @@ function checker:add_target(ip, port, hostname, healthy)
       end
     end
 
-    -- we first add the health status, and only then the updated list.
+    -- we first add the internal health, and only then the updated list.
     -- this prevents a state where a target is in the list, but does not
     -- have a key in the shm.
-    local ok, err = self.shm:set(get_shm_key(self.TARGET_STATUS, ip, port), healthy)
+    local ok, err = self.shm:set(key_for(self.TARGET_STATE, ip, port),
+                                 INTERNAL_STATES[internal_health])
     if not ok then
       self:log(ERR, "failed to set initial health status in shm: ", err)
     end
@@ -260,8 +272,7 @@ function checker:add_target(ip, port, hostname, healthy)
     end
 
     -- raise event for our newly added target
-    local event = healthy and "healthy" or "unhealthy"
-    self:raise_event(self.events[event], ip, port, hostname)
+    self:raise_event(self.events[internal_health], ip, port, hostname)
 
     return true
   end)
@@ -281,15 +292,11 @@ end
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 local function clear_target_data_from_shm(self, ip, port)
-    local ok, err = self.shm:set(get_shm_key(self.TARGET_STATUS, ip, port), nil)
+    local ok, err = self.shm:set(key_for(self.TARGET_STATE, ip, port), nil)
     if not ok then
       self:log(ERR, "failed to remove health status from shm: ", err)
     end
-    ok, err = self.shm:set(get_shm_key(self.TARGET_OKS, ip, port), nil)
-    if not ok then
-      self:log(ERR, "failed to clear health counter from shm: ", err)
-    end
-    ok, err = self.shm:set(get_shm_key(self.TARGET_NOKS, ip, port), nil)
+    ok, err = self.shm:set(key_for(self.TARGET_COUNTER, ip, port), nil)
     if not ok then
       self:log(ERR, "failed to clear health counter from shm: ", err)
     end
@@ -325,7 +332,7 @@ function checker:remove_target(ip, port)
     target_list = serialize(target_list)
 
     -- we first write the updated list, and only then remove the health
-    -- status this prevents race conditions when a healthchecker gets the
+    -- status; this prevents race conditions when a healthchecker gets the
     -- initial state from the shm
     local ok, err = self.shm:set(self.TARGET_LIST, target_list)
     if not ok then
@@ -384,7 +391,8 @@ function checker:get_target_status(ip, port)
   if not target then
     return nil, "target not found"
   end
-  return target.healthy
+  return target.internal_health == "healthy"
+      or target.internal_health == "mostly_healthy"
 
 end
 
@@ -413,7 +421,7 @@ local function locking_target(self, ip, port, fn)
   if not lock then
     return nil, "failed to create lock:" .. lock_err
   end
-  local lock_key = get_shm_key(self.TARGET_LOCK, ip, port)
+  local lock_key = key_for(self.TARGET_LOCK, ip, port)
 
   local ok, err = lock:lock(lock_key)
   if not ok then
@@ -432,19 +440,12 @@ local function locking_target(self, ip, port, fn)
 end
 
 
--- Return the value 1 for the counter at `idx` in a multi-counter.
--- @param idx The shift index specifying which counter to use.
--- @return The value 1 encoded for the 32-bit multi-counter.
-local function ctr_unit(idx)
-   return bit.lshift(1, idx)
-end
-
--- Extract the value of the counter at `idx` from multi-counter `val`.
--- @param val A 32-bit multi-counter holding 4 values.
+-- Extract the value of the counter at `idx` from multi-counter `multictr`.
+-- @param multictr A 32-bit multi-counter holding 4 values.
 -- @param idx The shift index specifying which counter to get.
 -- @return The 8-bit value extracted from the 32-bit multi-counter.
-local function ctr_get(val, idx)
-   return bit.band(bit.rshift(val, idx), 0xff)
+local function ctr_get(multictr, idx)
+   return bit.band(multictr / idx, 0xff)
 end
 
 
@@ -452,14 +453,14 @@ end
 -- is reached, it changes the status of the target in the shm and posts an
 -- event.
 -- @param self The checker object
--- @param health_mode "healthy" for the success counter that drives a target
+-- @param health_report "healthy" for the success counter that drives a target
 -- towards the healthy state; "unhealthy" for the failure counter.
 -- @param ip Target IP
 -- @param port Target port
 -- @param limit the limit after which target status is changed
 -- @param ctr_type the counter to increment, see CTR_xxx constants
 -- @return True if succeeded, or nil and an error message.
-local function incr_counter(self, health_mode, ip, port, limit, ctr_type)
+local function incr_counter(self, health_report, ip, port, limit, ctr_type)
 
   -- fail fast on counters that are disabled by configuration
   if limit == 0 then
@@ -474,45 +475,49 @@ local function incr_counter(self, health_mode, ip, port, limit, ctr_type)
     return true
   end
 
-  if (health_mode == "healthy" and target.healthy) or
-     (health_mode == "unhealthy" and not target.healthy) then
-    -- No need to count successes when healthy or failures when unhealthy
+  local current_health = target.internal_health
+  if health_report == current_health then
+    -- No need to count successes when internal health is fully "healthy"
+    -- or failures when internal health is fully "unhealthy"
     return true
   end
 
-  local counter, other, type_name
-  if health_mode == "healthy" then
-    counter   = self.TARGET_OKS
-    other     = self.TARGET_NOKS
-    type_name = CTR_NAME_SUCCESS[ctr_type]
-  else
-    counter   = self.TARGET_NOKS
-    other     = self.TARGET_OKS
-    type_name = CTR_NAME_FAILURE[ctr_type]
-  end
-
   return locking_target(self, ip, port, function()
-
-    local counter_key = get_shm_key(counter, ip, port)
-    local multictr, err = self.shm:incr(counter_key, ctr_unit(ctr_type), 0)
+    local counter_key = key_for(self.TARGET_COUNTER, ip, port)
+    local multictr, err = self.shm:incr(counter_key, ctr_type, 0)
     if err then
       return nil, err
     end
 
     local ctr = ctr_get(multictr, ctr_type)
 
-    self:log(WARN, health_mode, " ", type_name, " increment (", ctr, "/",
-                   limit, ") for ", ip, ":", port)
+    self:log(WARN, health_report, " ", COUNTER_NAMES[ctr_type],
+                   " increment (", ctr, "/", limit, ") for ", ip, ":", port)
 
-    if ctr == 1 then
-      local other_key = get_shm_key(other, ip, port)
-      self.shm:set(other_key, 0)
+    local new_multictr
+    if ctr_type == CTR_SUCCESS then
+      new_multictr = bit.band(multictr, MASK_SUCCESS)
+    else
+      new_multictr = bit.band(multictr, MASK_FAILURE)
     end
 
+    if new_multictr ~= multictr then
+      self.shm:set(counter_key, new_multictr)
+    end
+
+    local new_health
     if ctr >= limit then
-      local status_key = get_shm_key(self.TARGET_STATUS, ip, port)
-      self.shm:set(status_key, health_mode == "healthy")
-      self:raise_event(self.events[health_mode], ip, port, target.hostname)
+      new_health = health_report
+    elseif current_health == "healthy" and bit.band(new_multictr, MASK_FAILURE) > 0 then
+      new_health = "mostly_healthy"
+    elseif current_health == "unhealthy" and bit.band(new_multictr, MASK_SUCCESS) > 0 then
+      new_health = "mostly_unhealthy"
+    end
+
+    if new_health and new_health ~= current_health then
+      local state_key = key_for(self.TARGET_STATE, ip, port)
+      self.shm:set(state_key, INTERNAL_STATES[new_health])
+      self:raise_event(self.events[new_health], ip, port, target.hostname)
     end
 
     return true
@@ -586,19 +591,21 @@ function checker:report_http_status(ip, port, http_status, check)
 
   local checks = self.checks[check or "passive"]
 
-  local status_type, limit
+  local status_type, limit, ctr
   if checks.healthy.http_statuses[http_status] then
     status_type = "healthy"
     limit = checks.healthy.successes
+    ctr = CTR_SUCCESS
   elseif checks.unhealthy.http_statuses[http_status]
       or http_status == 0 then
     status_type = "unhealthy"
     limit = checks.unhealthy.http_failures
+    ctr = CTR_HTTP
   else
     return
   end
 
-  return incr_counter(self, status_type, ip, port, limit, CTR_HTTP)
+  return incr_counter(self, status_type, ip, port, limit, ctr)
 
 end
 
@@ -645,14 +652,14 @@ end
 -- This will immediately set the status and clear its counters.
 -- @param ip IP address of the target being checked
 -- @param port the port being checked against
--- @param mode boolean: `true` for healthy, `false` for unhealthy
+-- @param is_healthy boolean: `true` for healthy, `false` for unhealthy
 -- @return `true` on success, or `nil + error` on failure
-function checker:set_target_status(ip, port, mode)
+function checker:set_target_status(ip, port, is_healthy)
   ip   = tostring(assert(ip, "no ip address provided"))
   port = assert(tonumber(port), "no port number provided")
-  assert(type(mode) == "boolean")
+  assert(type(is_healthy) == "boolean")
 
-  local health_mode = mode and "healthy" or "unhealthy"
+  local health_report = is_healthy and "healthy" or "unhealthy"
 
   local target = (self.targets[ip] or EMPTY)[port]
   if not target then
@@ -661,37 +668,41 @@ function checker:set_target_status(ip, port, mode)
     return true
   end
 
-  local oks_key = get_shm_key(self.TARGET_OKS, ip, port)
-  local noks_key = get_shm_key(self.TARGET_NOKS, ip, port)
-  local status_key = get_shm_key(self.TARGET_STATUS, ip, port)
+  local counter_key = key_for(self.TARGET_COUNTER, ip, port)
+  local state_key = key_for(self.TARGET_STATE, ip, port)
 
   local ok, err = locking_target(self, ip, port, function()
 
-    local _, err = self.shm:set(oks_key, 0)
+    local _, err = self.shm:set(counter_key, 0)
     if err then
       return nil, err
     end
 
-    local _, err = self.shm:set(noks_key, 0)
+    self.shm:set(state_key, INTERNAL_STATES[health_report])
     if err then
       return nil, err
     end
 
-    self.shm:set(status_key, health_mode == "healthy")
-    if err then
-      return nil, err
-    end
-
-    self:raise_event(self.events[health_mode], ip, port, target.hostname)
+    self:raise_event(self.events[health_report], ip, port, target.hostname)
 
     return true
 
   end)
 
   if ok then
-    self:log(WARN, health_mode, " forced for ", ip, ":", port)
+    self:log(WARN, health_report, " forced for ", ip, ":", port)
   end
   return ok, err
+end
+
+
+-- Introspection function for testing
+local function test_get_counter(self, ip, port)
+  return locking_target(self, ip, port, function()
+    local counter = self.shm:get(key_for(self.TARGET_COUNTER, ip, port))
+    local internal_health = ((self.targets[ip] or EMPTY)[port] or EMPTY).internal_health
+    return counter, internal_health
+  end)
 end
 
 
@@ -701,9 +712,7 @@ end
 
 
 -- Runs a single healthcheck probe
-function checker:run_single_check(ip, port, hostname, healthy)
-
-  self:log(DEBUG, "Checking ", ip, ":", port, " (currently ", healthy and green("healthy") or red("unhealthy"), ")")
+function checker:run_single_check(ip, port, hostname)
 
   local sock, err = ngx.socket.tcp()
   if not sock then
@@ -775,8 +784,10 @@ end
 
 -- executes a work package (a list of checks) sequentially
 function checker:run_work_package(work_package)
-  for _, target in ipairs(work_package) do
-    self:run_single_check(target.ip, target.port, target.hostname, target.healthy)
+  for _, work_item in ipairs(work_package) do
+    self:log(DEBUG, "Checking ", work_item.ip, ":", work_item.port,
+                    " (currently ", work_item.debug_health, ")")
+    self:run_single_check(work_item.ip, work_item.port, work_item.hostname)
   end
 end
 
@@ -786,13 +797,13 @@ function checker:active_check_targets(list)
   local idx = 1
   local work_packages = {}
 
-  for _, target in ipairs(list) do
+  for _, work_item in ipairs(list) do
     local package = work_packages[idx]
     if not package then
       package = {}
       work_packages[idx] = package
     end
-    package[#package + 1] = target
+    package[#package + 1] = work_item
     idx = idx + 1
     if idx > self.checks.active.concurrency then idx = 1 end
   end
@@ -865,13 +876,17 @@ local function checker_callback(premature, self, health_mode)
     -- create a list of targets to check, here we can still do this atomically
     local start_time = ngx_now()
     local list_to_check = {}
-    local status = (health_mode == "healthy")
     for _, target in ipairs(self.targets) do
-      if target.healthy == status then
+      local internal_health = target.internal_health
+      if (health_mode == "healthy" and (internal_health == "healthy" or
+                                        internal_health == "mostly_healthy"))
+      or (health_mode == "unhealthy" and (internal_health == "unhealthy" or
+                                          internal_health == "mostly_unhealthy"))
+      then
         list_to_check[#list_to_check + 1] = {
           ip = target.ip,
           port = target.port,
-          healthy = target.healthy,
+          debug_health = internal_health,
         }
       end
     end
@@ -922,7 +937,10 @@ function checker:event_handler(event_name, ip, port, hostname)
     end
 
   elseif event_name == self.events.healthy or
-         event_name == self.events.unhealthy then
+         event_name == self.events.mostly_healthy or
+         event_name == self.events.unhealthy or
+         event_name == self.events.mostly_unhealthy
+         then
     if not target_found then
       -- it is a new target, must add it first
       target_found = { ip = ip, port = port, hostname = hostname }
@@ -931,10 +949,14 @@ function checker:event_handler(event_name, ip, port, hostname)
       self.targets[#self.targets + 1] = target_found
       self:log(DEBUG, "event: target added ", ip, ":", port)
     end
-    local health = (event_name == self.events.healthy)
-    self:log(DEBUG, "event: target status '", ip, ":", port,
-                    "' from '", target_found.healthy, "' to '", health, "'")
-    target_found.healthy = health
+    do
+      local from = target_found.internal_health
+      local to = event_name
+      self:log(DEBUG, "event: target status '", ip, ":", port,
+                      "' from '", from == "healthy" or from == "mostly_healthy",
+                      "' to '",   to   == "healthy" or to   == "mostly_healthy", "'")
+    end
+    target_found.internal_health = event_name
 
   elseif event_name == self.events.clear then
     -- clear local cache
@@ -1151,6 +1173,19 @@ function _M.new(opts)
 
   local self = fill_in_settings(opts, defaults)
 
+  assert(self.checks.active.healthy.successes < 255,        "checks.active.healthy.successes must be at most 254")
+  assert(self.checks.active.unhealthy.tcp_failures < 255,   "checks.active.unhealthy.tcp_failures must be at most 254")
+  assert(self.checks.active.unhealthy.http_failures < 255,  "checks.active.unhealthy.http_failures must be at most 254")
+  assert(self.checks.active.unhealthy.timeouts < 255,       "checks.active.unhealthy.timeouts must be at most 254")
+  assert(self.checks.passive.healthy.successes < 255,       "checks.passive.healthy.successes must be at most 254")
+  assert(self.checks.passive.unhealthy.tcp_failures < 255,  "checks.passive.unhealthy.tcp_failures must be at most 254")
+  assert(self.checks.passive.unhealthy.http_failures < 255, "checks.passive.unhealthy.http_failures must be at most 254")
+  assert(self.checks.passive.unhealthy.timeouts < 255,      "checks.passive.unhealthy.timeouts must be at most 254")
+
+  if opts.test then
+    self.test_get_counter = test_get_counter
+  end
+
   assert(self.name, "required option 'name' is missing")
   assert(self.shm_name, "required option 'shm_name' is missing")
   assert(({ http = true, tcp = true })[self.type], "type can only be 'http' " ..
@@ -1179,9 +1214,8 @@ function _M.new(opts)
   end
 
   -- prepare shm keys
-  self.TARGET_STATUS    = SHM_PREFIX .. self.name .. ":status"
-  self.TARGET_OKS       = SHM_PREFIX .. self.name .. ":oks"
-  self.TARGET_NOKS      = SHM_PREFIX .. self.name .. ":noks"
+  self.TARGET_STATE     = SHM_PREFIX .. self.name .. ":state"
+  self.TARGET_COUNTER   = SHM_PREFIX .. self.name .. ":counter"
   self.TARGET_LIST      = SHM_PREFIX .. self.name .. ":target_list"
   self.TARGET_LIST_LOCK = SHM_PREFIX .. self.name .. ":target_list_lock"
   self.TARGET_LOCK      = SHM_PREFIX .. self.name .. ":target_lock"
@@ -1207,9 +1241,10 @@ function _M.new(opts)
 
       -- load individual statuses
       for _, target in ipairs(self.targets) do
-        target.healthy = self.shm:get(get_shm_key(self.TARGET_STATUS,
-                                              target.ip, target.port))
-        self:log(DEBUG, "Got initial status ", target.healthy, " ", target.ip, ":", target.port)
+        local state_key = key_for(self.TARGET_STATE, target.ip, target.port)
+        target.internal_health = INTERNAL_STATES[self.shm:get(state_key)]
+        self:log(DEBUG, "Got initial status ", target.internal_health, " ",
+                        target.ip, ":", target.port)
         -- fill-in the hash part for easy lookup
         self.targets[target.ip] = self.targets[target.ip] or {}
         self.targets[target.ip][target.port] = target
