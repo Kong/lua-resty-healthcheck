@@ -96,7 +96,11 @@ for the complete API.
 
 ## History
 
-### 0.4.0 (20-Mar-2017)
+### 0.4.1 (21-May-2018)
+
+ * Fix internal management of healthcheck counters
+
+### 0.4.0 (20-Mar-2018)
 
  * Correct setting of defaults in `http_statuses`
  * Type and bounds checking to `checks` table
@@ -116,7 +120,7 @@ for the complete API.
 ## Copyright and License
 
 ```
-Copyright 2017 Kong Inc.
+Copyright 2017-2018 Kong Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
