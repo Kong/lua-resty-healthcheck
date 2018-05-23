@@ -886,6 +886,7 @@ local function checker_callback(premature, self, health_mode)
         list_to_check[#list_to_check + 1] = {
           ip = target.ip,
           port = target.port,
+          hostname = target.hostname or target.ip,
           debug_health = internal_health,
         }
       end
