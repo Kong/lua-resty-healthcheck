@@ -96,6 +96,10 @@ for the complete API.
 
 ## History
 
+### 0.4.2 (23-May-2018)
+
+ * Fix `Host` header in active healthchecks
+
 ### 0.4.1 (21-May-2018)
 
  * Fix internal management of healthcheck counters
