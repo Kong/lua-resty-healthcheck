@@ -25,7 +25,7 @@ qq{
     $::HttpConfig
 
     server {
-        listen 2112;
+        listen 2122;
         location = /status {
             return 200;
         }
@@ -68,13 +68,13 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2122, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
-            checker:report_timeout("127.0.0.1", 2112, "active")
+            checker:report_timeout("127.0.0.1", 2122, "active")
             checker:report_timeout("127.0.0.1", 2113, "passive")
-            checker:report_timeout("127.0.0.1", 2112, "active")
+            checker:report_timeout("127.0.0.1", 2122, "active")
             checker:report_timeout("127.0.0.1", 2113, "passive")
-            ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- false
+            ngx.say(checker:get_target_status("127.0.0.1", 2122))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- false
         }
     }
@@ -86,9 +86,9 @@ false
 --- error_log
 checking healthy targets: nothing to do
 checking unhealthy targets: nothing to do
-unhealthy TIMEOUT increment (1/2) for 127.0.0.1:2112
-unhealthy TIMEOUT increment (2/2) for 127.0.0.1:2112
-event: target status '127.0.0.1:2112' from 'true' to 'false'
+unhealthy TIMEOUT increment (1/2) for 127.0.0.1:2122
+unhealthy TIMEOUT increment (2/2) for 127.0.0.1:2122
+event: target status '127.0.0.1:2122' from 'true' to 'false'
 unhealthy TIMEOUT increment (1/2) for 127.0.0.1:2113
 unhealthy TIMEOUT increment (2/2) for 127.0.0.1:2113
 event: target status '127.0.0.1:2113' from 'true' to 'false'
@@ -100,7 +100,7 @@ qq{
     $::HttpConfig
 
     server {
-        listen 2112;
+        listen 2122;
         location = /status {
             return 200;
         }
@@ -143,11 +143,11 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
-            checker:report_timeout("127.0.0.1", 2112, "active")
-            checker:report_timeout("127.0.0.1", 2112, "active")
-            checker:report_timeout("127.0.0.1", 2112, "active")
-            ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
+            local ok, err = checker:add_target("127.0.0.1", 2122, nil, true)
+            checker:report_timeout("127.0.0.1", 2122, "active")
+            checker:report_timeout("127.0.0.1", 2122, "active")
+            checker:report_timeout("127.0.0.1", 2122, "active")
+            ngx.say(checker:get_target_status("127.0.0.1", 2122))  -- true
         }
     }
 --- request
@@ -159,7 +159,7 @@ checking healthy targets: nothing to do
 checking unhealthy targets: nothing to do
 --- no_error_log
 unhealthy TCP increment
-event: target status '127.0.0.1:2112' from 'true' to 'false'
+event: target status '127.0.0.1:2122' from 'true' to 'false'
 
 
 
@@ -169,7 +169,7 @@ qq{
     $::HttpConfig
 
     server {
-        listen 2112;
+        listen 2122;
         location = /status {
             return 200;
         }
@@ -212,11 +212,11 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
-            checker:report_timeout("127.0.0.1", 2112, "passive")
-            checker:report_timeout("127.0.0.1", 2112, "passive")
-            checker:report_timeout("127.0.0.1", 2112, "passive")
-            ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
+            local ok, err = checker:add_target("127.0.0.1", 2122, nil, true)
+            checker:report_timeout("127.0.0.1", 2122, "passive")
+            checker:report_timeout("127.0.0.1", 2122, "passive")
+            checker:report_timeout("127.0.0.1", 2122, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2122))  -- true
         }
     }
 --- request
@@ -228,4 +228,4 @@ checking healthy targets: nothing to do
 checking unhealthy targets: nothing to do
 --- no_error_log
 unhealthy TCP increment
-event: target status '127.0.0.1:2112' from 'true' to 'false'
+event: target status '127.0.0.1:2122' from 'true' to 'false'

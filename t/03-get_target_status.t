@@ -23,7 +23,7 @@ qq{
     $::HttpConfig
 
     server {
-        listen 2112;
+        listen 2115;
         location = /status {
             return 200;
         }
@@ -63,12 +63,12 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
-            ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
-            checker:report_tcp_failure("127.0.0.1", 2112)
-            ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- false
-            checker:report_success("127.0.0.1", 2112)
-            ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
+            local ok, err = checker:add_target("127.0.0.1", 2115, nil, true)
+            ngx.say(checker:get_target_status("127.0.0.1", 2115))  -- true
+            checker:report_tcp_failure("127.0.0.1", 2115)
+            ngx.say(checker:get_target_status("127.0.0.1", 2115))  -- false
+            checker:report_success("127.0.0.1", 2115)
+            ngx.say(checker:get_target_status("127.0.0.1", 2115))  -- true
         }
     }
 --- request

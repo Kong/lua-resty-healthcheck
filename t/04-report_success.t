@@ -25,7 +25,7 @@ qq{
     $::HttpConfig
 
     server {
-        listen 2112;
+        listen 2116;
         location = /status {
             return 200;
         }
@@ -66,16 +66,16 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2112, nil, false)
-            local ok, err = checker:add_target("127.0.0.1", 2113, nil, false)
-            checker:report_success("127.0.0.1", 2112, "active")
-            checker:report_success("127.0.0.1", 2113, "passive")
-            checker:report_success("127.0.0.1", 2112, "active")
-            checker:report_success("127.0.0.1", 2113, "passive")
-            checker:report_success("127.0.0.1", 2112, "active")
-            checker:report_success("127.0.0.1", 2113, "passive")
-            ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
-            ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- true
+            local ok, err = checker:add_target("127.0.0.1", 2116, nil, false)
+            local ok, err = checker:add_target("127.0.0.1", 2118, nil, false)
+            checker:report_success("127.0.0.1", 2116, "active")
+            checker:report_success("127.0.0.1", 2118, "passive")
+            checker:report_success("127.0.0.1", 2116, "active")
+            checker:report_success("127.0.0.1", 2118, "passive")
+            checker:report_success("127.0.0.1", 2116, "active")
+            checker:report_success("127.0.0.1", 2118, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2116))  -- true
+            ngx.say(checker:get_target_status("127.0.0.1", 2118))  -- true
         }
     }
 --- request
@@ -86,14 +86,14 @@ true
 --- error_log
 checking healthy targets: nothing to do
 checking unhealthy targets: nothing to do
-healthy SUCCESS increment (1/3) for 127.0.0.1:2112
-healthy SUCCESS increment (2/3) for 127.0.0.1:2112
-healthy SUCCESS increment (3/3) for 127.0.0.1:2112
-event: target status '127.0.0.1:2112' from 'false' to 'true'
-healthy SUCCESS increment (1/3) for 127.0.0.1:2113
-healthy SUCCESS increment (2/3) for 127.0.0.1:2113
-healthy SUCCESS increment (3/3) for 127.0.0.1:2113
-event: target status '127.0.0.1:2113' from 'false' to 'true'
+healthy SUCCESS increment (1/3) for 127.0.0.1:2116
+healthy SUCCESS increment (2/3) for 127.0.0.1:2116
+healthy SUCCESS increment (3/3) for 127.0.0.1:2116
+event: target status '127.0.0.1:2116' from 'false' to 'true'
+healthy SUCCESS increment (1/3) for 127.0.0.1:2118
+healthy SUCCESS increment (2/3) for 127.0.0.1:2118
+healthy SUCCESS increment (3/3) for 127.0.0.1:2118
+event: target status '127.0.0.1:2118' from 'false' to 'true'
 
 
 === TEST 2: report_success() recovers TCP active = passive
@@ -102,7 +102,7 @@ qq{
     $::HttpConfig
 
     server {
-        listen 2112;
+        listen 2116;
         location = /status {
             return 200;
         }
@@ -143,16 +143,16 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2112, nil, false)
-            local ok, err = checker:add_target("127.0.0.1", 2113, nil, false)
-            checker:report_success("127.0.0.1", 2112, "active")
-            checker:report_success("127.0.0.1", 2113, "passive")
-            checker:report_success("127.0.0.1", 2112, "active")
-            checker:report_success("127.0.0.1", 2113, "passive")
-            checker:report_success("127.0.0.1", 2112, "active")
-            checker:report_success("127.0.0.1", 2113, "passive")
-            ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
-            ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- true
+            local ok, err = checker:add_target("127.0.0.1", 2116, nil, false)
+            local ok, err = checker:add_target("127.0.0.1", 2118, nil, false)
+            checker:report_success("127.0.0.1", 2116, "active")
+            checker:report_success("127.0.0.1", 2118, "passive")
+            checker:report_success("127.0.0.1", 2116, "active")
+            checker:report_success("127.0.0.1", 2118, "passive")
+            checker:report_success("127.0.0.1", 2116, "active")
+            checker:report_success("127.0.0.1", 2118, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2116))  -- true
+            ngx.say(checker:get_target_status("127.0.0.1", 2118))  -- true
         }
     }
 --- request
@@ -163,14 +163,14 @@ true
 --- error_log
 checking healthy targets: nothing to do
 checking unhealthy targets: nothing to do
-healthy SUCCESS increment (1/3) for 127.0.0.1:2112
-healthy SUCCESS increment (2/3) for 127.0.0.1:2112
-healthy SUCCESS increment (3/3) for 127.0.0.1:2112
-event: target status '127.0.0.1:2112' from 'false' to 'true'
-healthy SUCCESS increment (1/3) for 127.0.0.1:2113
-healthy SUCCESS increment (2/3) for 127.0.0.1:2113
-healthy SUCCESS increment (3/3) for 127.0.0.1:2113
-event: target status '127.0.0.1:2113' from 'false' to 'true'
+healthy SUCCESS increment (1/3) for 127.0.0.1:2116
+healthy SUCCESS increment (2/3) for 127.0.0.1:2116
+healthy SUCCESS increment (3/3) for 127.0.0.1:2116
+event: target status '127.0.0.1:2116' from 'false' to 'true'
+healthy SUCCESS increment (1/3) for 127.0.0.1:2118
+healthy SUCCESS increment (2/3) for 127.0.0.1:2118
+healthy SUCCESS increment (3/3) for 127.0.0.1:2118
+event: target status '127.0.0.1:2118' from 'false' to 'true'
 
 === TEST 3: report_success() is a nop when active.healthy.sucesses == 0
 --- http_config eval
@@ -178,7 +178,7 @@ qq{
     $::HttpConfig
 
     server {
-        listen 2112;
+        listen 2116;
         location = /status {
             return 200;
         }
@@ -219,11 +219,11 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2112, nil, false)
-            checker:report_success("127.0.0.1", 2112, "active")
-            checker:report_success("127.0.0.1", 2112, "active")
-            checker:report_success("127.0.0.1", 2112, "active")
-            ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- false
+            local ok, err = checker:add_target("127.0.0.1", 2116, nil, false)
+            checker:report_success("127.0.0.1", 2116, "active")
+            checker:report_success("127.0.0.1", 2116, "active")
+            checker:report_success("127.0.0.1", 2116, "active")
+            ngx.say(checker:get_target_status("127.0.0.1", 2116))  -- false
         }
     }
 --- request
@@ -232,7 +232,7 @@ GET /t
 false
 --- no_error_log
 healthy SUCCESS increment
-event: target status '127.0.0.1:2112' from 'false' to 'true'
+event: target status '127.0.0.1:2116' from 'false' to 'true'
 
 
 
@@ -242,7 +242,7 @@ qq{
     $::HttpConfig
 
     server {
-        listen 2113;
+        listen 2118;
         location = /status {
             return 200;
         }
@@ -283,11 +283,11 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2113, nil, false)
-            checker:report_success("127.0.0.1", 2113, "passive")
-            checker:report_success("127.0.0.1", 2113, "passive")
-            checker:report_success("127.0.0.1", 2113, "passive")
-            ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- false
+            local ok, err = checker:add_target("127.0.0.1", 2118, nil, false)
+            checker:report_success("127.0.0.1", 2118, "passive")
+            checker:report_success("127.0.0.1", 2118, "passive")
+            checker:report_success("127.0.0.1", 2118, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2118))  -- false
         }
     }
 --- request
@@ -296,4 +296,4 @@ GET /t
 false
 --- no_error_log
 healthy SUCCESS increment
-event: target status '127.0.0.1:2113' from 'false' to 'true'
+event: target status '127.0.0.1:2118' from 'false' to 'true'
