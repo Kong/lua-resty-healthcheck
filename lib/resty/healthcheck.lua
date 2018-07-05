@@ -740,6 +740,7 @@ function checker:run_single_check(ip, port, hostname)
   if self.type == "https" then
     session, err = sock:sslhandshake(nil, hostname, true)
     if not session then
+      sock:close()
       return self:report_tcp_failure(ip, port, "connect", "active")
     end
   end
