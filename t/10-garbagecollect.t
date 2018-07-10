@@ -25,7 +25,7 @@ qq{
     $::HttpConfig
 
     server {
-        listen 2112;
+        listen 2121;
         location = /status {
             return 200;
         }
@@ -61,7 +61,7 @@ qq{
                     },
                 }
             })
-            assert(checker:add_target("127.0.0.1", 2112, nil, true))
+            assert(checker:add_target("127.0.0.1", 2121, nil, true))
             local weak_table = setmetatable({ checker },{
               __mode = "v",
             })
