@@ -737,7 +737,13 @@ function checker:run_single_check(ip, port, hostname)
     return self:report_tcp_success(ip, port, "active")
   end
 
-  -- TODO: implement https
+  if self.type == "https" then
+    session, err = sock:sslhandshake(nil, hostname, true)
+    if not session then
+      sock:close()
+      return self:report_tcp_failure(ip, port, "connect", "active")
+    end
+  end
 
   local path = self.checks.active.http_path
   local request = ("GET %s HTTP/1.0\r\nHost: %s\r\n\r\n"):format(path, hostname)
@@ -1189,7 +1195,7 @@ function _M.new(opts)
 
   assert(self.name, "required option 'name' is missing")
   assert(self.shm_name, "required option 'shm_name' is missing")
-  assert(({ http = true, tcp = true })[self.type], "type can only be 'http' " ..
+  assert(({ http = true, tcp = true, https = true })[self.type], "type can only be 'http', 'https' " ..
           "or 'tcp', got '" .. tostring(self.type) .. "'")
 
   self.shm = ngx.shared[tostring(opts.shm_name)]
