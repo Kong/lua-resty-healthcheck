@@ -35,7 +35,6 @@ __DATA__
                 type = "https",
                 checks = {
                     active = {
-                        https = true,
                         http_path = "/",
                         healthy  = {
                             interval = 2,

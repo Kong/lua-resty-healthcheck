@@ -738,6 +738,7 @@ function checker:run_single_check(ip, port, hostname)
   end
 
   if self.type == "https" then
+    local session
     session, err = sock:sslhandshake(nil, hostname, true)
     if not session then
       sock:close()
