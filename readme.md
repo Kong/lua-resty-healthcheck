@@ -15,63 +15,57 @@ http {
     lua_shared_dict test_shm 8m;
     lua_shared_dict my_worker_events 8m;
     init_worker_by_lua_block {
+
         local we = require "resty.worker.events"
-        local ok, err = we.configure{
+        local ok, err = we.configure({
             shm = "my_worker_events",
-            interval = 0.1,
-        }
+            interval = 0.1
+        })
         if not ok then
             ngx.log(ngx.ERR, "failed to configure worker events: ", err)
             return
         end
 
-        ngx.timer.at(0, function()
-            local healthcheck = require("resty.healthcheck")
-            local checker = healthcheck.new({
-                name = "test_checker",
-                shm_name = "test_shm",
-                checks = {
-                    active = {
-                        http_request = "GET /status HTTP/1.0\r\nHost: example.com\r\n\r\n",
-                        healthy = {
-                            interval = 0.5
-                        },
-                        unhealthy = {
-                            interval = 0.5
-                        }
+        local healthcheck = require("resty.healthcheck")
+        local checker = healthcheck.new({
+            name = "testing",
+            shm_name = "test_shm",
+            type = "http",
+            checks = {
+                active = {
+                    http_path = "/status",
+                    healthy  = {
+                        interval = 2,
+                        successes = 1,
+                    },
+                    unhealthy  = {
+                        interval = 1,
+                        http_failures = 2,
                     }
-                }
-            })
+                },
+            }
+        })
 
-            local handler = function(target, eventname, sourcename, pid)
-                ngx.log(ngx.DEBUG,"Event from: ", sourcename)
-                if eventname == checker.events.remove
-                    -- a target was removed
-                    ngx.log(ngx.DEBUG,"Target removed: ",
-                        target.ip, ":", target.port, " ", target.hostname)
-                elseif eventname == checker.events.healthy
-                    -- target changed state, or was added
-                    ngx.log(ngx.DEBUG,"Target switched to healthy: ",
-                        target.ip, ":", target.port, " ", target.hostname)
-                elseif eventname ==  checker.events.unhealthy
-                    -- target changed state, or was added
-                    ngx.log(ngx.DEBUG,"Target switched to unhealthy: ",
-                        target.ip, ":", target.port, " ", target.hostname)
-                else
-                    -- unknown event
-                end
-            end
-            we.register(handler, checker.EVENT_SOURCE)
+        local ok, err = checker:add_target("127.0.0.1", 8080, "example.com", false)
 
-            local ok, err = checker:add_target("127.0.0.1", 2112)
-            if not ok then
-                ngx.log(ngx.ERR, err)
+        local handler = function(target, eventname, sourcename, pid)
+            ngx.log(ngx.DEBUG,"Event from: ", sourcename)
+            if eventname == checker.events.remove
+                -- a target was removed
+                ngx.log(ngx.DEBUG,"Target removed: ",
+                    target.ip, ":", target.port, " ", target.hostname)
+            elseif eventname == checker.events.healthy
+                -- target changed state, or was added
+                ngx.log(ngx.DEBUG,"Target switched to healthy: ",
+                    target.ip, ":", target.port, " ", target.hostname)
+            elseif eventname ==  checker.events.unhealthy
+                -- target changed state, or was added
+                ngx.log(ngx.DEBUG,"Target switched to unhealthy: ",
+                    target.ip, ":", target.port, " ", target.hostname)
+            else
+                -- unknown event
             end
-            local ok, err = checker:add_target("127.0.0.1", 5150)
-            if not ok then
-                ngx.log(ngx.ERR, err)
-            end
-        end)
+        end
     }
 }
 ```
