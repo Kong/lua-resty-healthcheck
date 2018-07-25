@@ -32,9 +32,9 @@ __DATA__
             local checker = healthcheck.new({
                 name = "testing",
                 shm_name = "test_shm",
-                type = "https",
                 checks = {
                     active = {
+                        type = "https",
                         http_path = "/",
                         healthy  = {
                             interval = 2,
@@ -72,9 +72,9 @@ true
             local checker = healthcheck.new({
                 name = "testing",
                 shm_name = "test_shm",
-                type = "https",
                 checks = {
                     active = {
+                        type = "https",
                         http_path = "/",
                         healthy  = {
                             interval = 2,

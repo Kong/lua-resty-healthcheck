@@ -30,9 +30,9 @@ http {
         local checker = healthcheck.new({
             name = "testing",
             shm_name = "test_shm",
-            type = "http",
             checks = {
                 active = {
+                    type = "https",
                     http_path = "/status",
                     healthy  = {
                         interval = 2,

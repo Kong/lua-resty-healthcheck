@@ -542,7 +542,7 @@ function checker:report_failure(ip, port, check)
 
   local checks = self.checks[check or "passive"]
   local limit, ctr_type
-  if self.type == "tcp" then
+  if self.checks[check or "passive"].type == "tcp" then
     limit = checks.unhealthy.tcp_failures
     ctr_type = CTR_TCP
   else
@@ -732,12 +732,12 @@ function checker:run_single_check(ip, port, hostname)
     return self:report_tcp_failure(ip, port, "connect", "active")
   end
 
-  if self.type == "tcp" then
+  if self.checks.active.type == "tcp" then
     sock:close()
     return self:report_tcp_success(ip, port, "active")
   end
 
-  if self.type == "https" then
+  if self.checks.active.type == "https" then
     local session
     session, err = sock:sslhandshake(nil, hostname, true)
     if not session then
@@ -1095,9 +1095,10 @@ end
 local defaults = {
   name = NO_DEFAULT,
   shm_name = NO_DEFAULT,
-  type = "http",
+  type = NO_DEFAULT,
   checks = {
     active = {
+      type = "http",
       timeout = 1,
       concurrency = 10,
       http_path = "/",
@@ -1116,6 +1117,7 @@ local defaults = {
       },
     },
     passive = {
+      type = "http",
       healthy = {
         http_statuses = { 200, 201, 202, 203, 204, 205, 206, 207, 208, 226,
                           300, 301, 302, 303, 304, 305, 306, 307, 308 },
@@ -1141,6 +1143,20 @@ local function to_set(tbl, key)
 end
 
 
+local check_valid_type
+do
+  local valid_types = {
+    http = true,
+    tcp = true,
+    https = true,
+  }
+  check_valid_type = function(var, val)
+    assert(valid_types[val],
+           var .. " can only be 'http', 'https' or 'tcp', got '" ..
+           tostring(val) .. "'")
+  end
+end
+
 --- Creates a new health-checker instance.
 -- It will be started upon creation.
 --
@@ -1150,7 +1166,7 @@ end
 --
 -- * `name`: name of the health checker
 -- * `shm_name`: the name of the `lua_shared_dict` specified in the Nginx configuration to use
--- * `type`: "http", "https" or "tcp"
+-- * `checks.active.type`: "http", "https" or "tcp" (default is "http")
 -- * `checks.active.timeout`: socket timeout for active checks (in seconds)
 -- * `checks.active.concurrency`: number of targets to check concurrently
 -- * `checks.active.http_path`: path to use in `GET` HTTP request to run on active checks
@@ -1162,6 +1178,7 @@ end
 -- * `checks.active.unhealthy.tcp_failures`: number of TCP failures to consider a target unhealthy
 -- * `checks.active.unhealthy.timeouts`: number of timeouts to consider a target unhealthy
 -- * `checks.active.unhealthy.http_failures`: number of HTTP failures to consider a target unhealthy
+-- * `checks.passive.type`: "http", "https" or "tcp" (default is "http"; for passive checks, "http" and "https" are equivalent)
 -- * `checks.passive.healthy.http_statuses`: which HTTP statuses to consider a failure
 -- * `checks.passive.healthy.successes`: number of successes to consider a target healthy
 -- * `checks.passive.unhealthy.http_statuses`: which HTTP statuses to consider a success
@@ -1179,7 +1196,18 @@ function _M.new(opts)
   assert(worker_events.configured(), "please configure the " ..
       "'lua-resty-worker-events' module before using 'lua-resty-healthcheck'")
 
+  local active_type = (((opts or EMPTY).checks or EMPTY).active or EMPTY).type
+  local passive_type = (((opts or EMPTY).checks or EMPTY).passive or EMPTY).type
+
   local self = fill_in_settings(opts, defaults)
+
+  -- If using deprecated self.type, that takes precedence over
+  -- a default value. TODO: remove this in a future version
+  if self.type then
+    self.checks.active.type = active_type or self.type
+    self.checks.passive.type = passive_type or self.type
+    check_valid_type("type", self.type)
+  end
 
   assert(self.checks.active.healthy.successes < 255,        "checks.active.healthy.successes must be at most 254")
   assert(self.checks.active.unhealthy.tcp_failures < 255,   "checks.active.unhealthy.tcp_failures must be at most 254")
@@ -1196,8 +1224,9 @@ function _M.new(opts)
 
   assert(self.name, "required option 'name' is missing")
   assert(self.shm_name, "required option 'shm_name' is missing")
-  assert(({ http = true, tcp = true, https = true })[self.type], "type can only be 'http', 'https' " ..
-          "or 'tcp', got '" .. tostring(self.type) .. "'")
+
+  check_valid_type("checks.active.type", self.checks.active.type)
+  check_valid_type("checks.passive.type", self.checks.passive.type)
 
   self.shm = ngx.shared[tostring(opts.shm_name)]
   assert(self.shm, ("no shm found by name '%s'"):format(opts.shm_name))
