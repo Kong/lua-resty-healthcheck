@@ -90,6 +90,13 @@ for the complete API.
 
 ## History
 
+### 0.5.0 (25-Jul-2018)
+
+ * Add support for `https` -- thanks @gaetanfl for the PR!
+ * Introduce separate `checks.active.type` and `checks.passive.type` fields;
+   the top-level `type` field is still supported as a fallback but is now
+   deprecated.
+
 ### 0.4.2 (23-May-2018)
 
  * Fix `Host` header in active healthchecks

@@ -1,9 +1,9 @@
 package = "lua-resty-healthcheck"
-version = "0.4.2-1"
+version = "0.5.0-1"
 source = {
-   url = "https://github.com/Kong/lua-resty-healthcheck/archive/0.4.2.tar.gz",
-   tag = "0.4.2",
-   dir = "lua-resty-healthcheck-0.4.2"
+   url = "https://github.com/Kong/lua-resty-healthcheck/archive/0.5.0.tar.gz",
+   tag = "0.5.0",
+   dir = "lua-resty-healthcheck-0.5.0"
 }
 description = {
    summary = "Healthchecks for OpenResty to check upstream service status",
