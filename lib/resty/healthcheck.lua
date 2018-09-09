@@ -988,6 +988,10 @@ function checker:log(level, ...)
   ngx_log(level, worker_color(self.LOG_PREFIX), ...)
 end
 
+-- Get the checker' name
+function checker:get_name()
+  return self.name
+end
 
 -- Raises an event for a target status change.
 function checker:raise_event(event_name, ip, port, hostname)
