@@ -90,6 +90,12 @@ for the complete API.
 
 ## History
 
+### 0.6.0 (26-Sep-2018)
+
+ * Introduce `checks.active.https_verify_certificate` field.
+   It is `true` by default; setting it to `false` disables certificate
+   verification in active healthchecks over HTTPS.
+
 ### 0.5.0 (25-Jul-2018)
 
  * Add support for `https` -- thanks @gaetanfl for the PR!
