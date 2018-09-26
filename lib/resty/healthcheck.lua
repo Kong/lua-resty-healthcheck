@@ -739,7 +739,8 @@ function checker:run_single_check(ip, port, hostname)
 
   if self.checks.active.type == "https" then
     local session
-    session, err = sock:sslhandshake(nil, hostname, true)
+    session, err = sock:sslhandshake(nil, hostname,
+                                     self.checks.active.https_verify_certificate)
     if not session then
       sock:close()
       return self:report_tcp_failure(ip, port, "connect", "active")
@@ -1068,7 +1069,7 @@ local function fill_in_settings(opts, defaults, ctx)
       fail(ctx, k, "invalid value")
     end
 
-    if v then
+    if v ~= nil then
       if type(v) == "table" then
         if default[1] then -- do not recurse on arrays
           obj[k] = v
@@ -1102,6 +1103,7 @@ local defaults = {
       timeout = 1,
       concurrency = 10,
       http_path = "/",
+      https_verify_certificate = true,
       healthy = {
         interval = 0, -- 0 = disabled by default
         http_statuses = { 200, 302 },
@@ -1170,6 +1172,7 @@ end
 -- * `checks.active.timeout`: socket timeout for active checks (in seconds)
 -- * `checks.active.concurrency`: number of targets to check concurrently
 -- * `checks.active.http_path`: path to use in `GET` HTTP request to run on active checks
+-- * `checks.active.https_verify_certificate`: boolean indicating whether to verify the HTTPS certificate
 -- * `checks.active.healthy.interval`: interval between checks for healthy targets (in seconds)
 -- * `checks.active.healthy.http_statuses`: which HTTP statuses to consider a success
 -- * `checks.active.healthy.successes`: number of successes to consider a target healthy
