@@ -1267,12 +1267,6 @@ function _M.new(opts)
   -- register for events, and directly after load initial target list
   -- order is important!
   do
-    self.ev_callback = function(data, event)
-      -- just a wrapper to be able to access `self` as a closure
-      return self:event_handler(event, data.ip, data.port, data.hostname)
-    end
-    worker_events.register_weak(self.ev_callback, self.EVENT_SOURCE)
-
     -- Lock the list, in case it is being cleared by another worker
     local ok, err = locking_target_list(self, function(target_list)
 
@@ -1295,6 +1289,12 @@ function _M.new(opts)
     if not ok then
       self:log(ERR, "Error loading initial target list: ", err)
     end
+	
+	self.ev_callback = function(data, event)
+      -- just a wrapper to be able to access `self` as a closure
+      return self:event_handler(event, data.ip, data.port, data.hostname)
+    end
+    worker_events.register_weak(self.ev_callback, self.EVENT_SOURCE)
 
     -- handle events to sync up in case there was a change by another worker
     worker_events:poll()
