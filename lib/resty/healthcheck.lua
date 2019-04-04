@@ -1289,8 +1289,8 @@ function _M.new(opts)
     if not ok then
       self:log(ERR, "Error loading initial target list: ", err)
     end
-	
-	self.ev_callback = function(data, event)
+
+    self.ev_callback = function(data, event)
       -- just a wrapper to be able to access `self` as a closure
       return self:event_handler(event, data.ip, data.port, data.hostname)
     end
