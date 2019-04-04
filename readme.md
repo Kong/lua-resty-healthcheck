@@ -4,10 +4,6 @@
 
 A health check library for OpenResty.
 
-## Status
-
-This library is still under early development.
-
 ## Synopsis
 
 ```nginx
@@ -89,6 +85,12 @@ See the [online LDoc documentation](http://kong.github.io/lua-resty-healthcheck)
 for the complete API.
 
 ## History
+
+### 0.6.1 (04-Apr-2019)
+
+ * Fix: set up event callback only after target list is loaded
+   [#18](https://github.com/Kong/lua-resty-healthcheck/pull/18);
+   fixes Kong issue [#4453](https://github.com/Kong/kong/issues/4453)
 
 ### 0.6.0 (26-Sep-2018)
 
