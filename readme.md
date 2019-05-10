@@ -86,6 +86,12 @@ for the complete API.
 
 ## History
 
+### 0.6.x (xx-xxx-2019)   UNRELEASED
+
+ * Fix: fix reporting active TCP probe successes
+   [#20](https://github.com/Kong/lua-resty-healthcheck/pull/20);
+   fixes issue [#19](https://github.com/Kong/lua-resty-healthcheck/issues/19)
+
 ### 0.6.1 (04-Apr-2019)
 
  * Fix: set up event callback only after target list is loaded
