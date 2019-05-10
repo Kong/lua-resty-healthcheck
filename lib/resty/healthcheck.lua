@@ -734,7 +734,7 @@ function checker:run_single_check(ip, port, hostname)
 
   if self.checks.active.type == "tcp" then
     sock:close()
-    return self:report_tcp_success(ip, port, "active")
+    return self:report_success(ip, port, "active")
   end
 
   if self.checks.active.type == "https" then
