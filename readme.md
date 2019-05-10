@@ -86,7 +86,7 @@ for the complete API.
 
 ## History
 
-### 0.6.x (xx-xxx-2019)   UNRELEASED
+### 0.6.2 (10-May-2019)
 
  * Fix: fix reporting active TCP probe successes
    [#20](https://github.com/Kong/lua-resty-healthcheck/pull/20);
