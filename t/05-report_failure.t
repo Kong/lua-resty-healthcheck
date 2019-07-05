@@ -68,14 +68,14 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2117, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
-            checker:report_failure("127.0.0.1", 2117, "active")
-            checker:report_failure("127.0.0.1", 2113, "passive")
-            checker:report_failure("127.0.0.1", 2117, "active")
-            checker:report_failure("127.0.0.1", 2113, "passive")
-            checker:report_failure("127.0.0.1", 2117, "active")
-            checker:report_failure("127.0.0.1", 2113, "passive")
-            ngx.say(checker:get_target_status("127.0.0.1", 2117))  -- false
-            ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- false
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2117, nil))  -- false
+            ngx.say(checker:get_target_status("127.0.0.1", 2113, nil))  -- false
         }
     }
 --- request
@@ -86,14 +86,14 @@ false
 --- error_log
 checking healthy targets: nothing to do
 checking unhealthy targets: nothing to do
-unhealthy HTTP increment (1/3) for 127.0.0.1:2117
-unhealthy HTTP increment (2/3) for 127.0.0.1:2117
-unhealthy HTTP increment (3/3) for 127.0.0.1:2117
-event: target status '127.0.0.1:2117' from 'true' to 'false'
-unhealthy HTTP increment (1/3) for 127.0.0.1:2113
-unhealthy HTTP increment (2/3) for 127.0.0.1:2113
-unhealthy HTTP increment (3/3) for 127.0.0.1:2113
-event: target status '127.0.0.1:2113' from 'true' to 'false'
+unhealthy HTTP increment (1/3) for '(127.0.0.1:2117)'
+unhealthy HTTP increment (2/3) for '(127.0.0.1:2117)'
+unhealthy HTTP increment (3/3) for '(127.0.0.1:2117)'
+event: target status '(127.0.0.1:2117)' from 'true' to 'false'
+unhealthy HTTP increment (1/3) for '(127.0.0.1:2113)'
+unhealthy HTTP increment (2/3) for '(127.0.0.1:2113)'
+unhealthy HTTP increment (3/3) for '(127.0.0.1:2113)'
+event: target status '(127.0.0.1:2113)' from 'true' to 'false'
 
 
 === TEST 2: report_failure() fails TCP active + passive
@@ -145,14 +145,14 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2117, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
-            checker:report_failure("127.0.0.1", 2117, "active")
-            checker:report_failure("127.0.0.1", 2113, "passive")
-            checker:report_failure("127.0.0.1", 2117, "active")
-            checker:report_failure("127.0.0.1", 2113, "passive")
-            checker:report_failure("127.0.0.1", 2117, "active")
-            checker:report_failure("127.0.0.1", 2113, "passive")
-            ngx.say(checker:get_target_status("127.0.0.1", 2117))  -- false
-            ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- false
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2117, nil))  -- false
+            ngx.say(checker:get_target_status("127.0.0.1", 2113, nil))  -- false
         }
     }
 --- request
@@ -163,12 +163,12 @@ false
 --- error_log
 checking healthy targets: nothing to do
 checking unhealthy targets: nothing to do
-unhealthy TCP increment (1/2) for 127.0.0.1:2117
-unhealthy TCP increment (2/2) for 127.0.0.1:2117
-event: target status '127.0.0.1:2117' from 'true' to 'false'
-unhealthy TCP increment (1/2) for 127.0.0.1:2113
-unhealthy TCP increment (2/2) for 127.0.0.1:2113
-event: target status '127.0.0.1:2113' from 'true' to 'false'
+unhealthy TCP increment (1/2) for '(127.0.0.1:2117)'
+unhealthy TCP increment (2/2) for '(127.0.0.1:2117)'
+event: target status '(127.0.0.1:2117)' from 'true' to 'false'
+unhealthy TCP increment (1/2) for '(127.0.0.1:2113)'
+unhealthy TCP increment (2/2) for '(127.0.0.1:2113)'
+event: target status '(127.0.0.1:2113)' from 'true' to 'false'
 
 
 === TEST 3: report_failure() is a nop when failure counters == 0
@@ -220,14 +220,14 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2117, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
-            checker:report_failure("127.0.0.1", 2117, "active")
-            checker:report_failure("127.0.0.1", 2113, "passive")
-            checker:report_failure("127.0.0.1", 2117, "active")
-            checker:report_failure("127.0.0.1", 2113, "passive")
-            checker:report_failure("127.0.0.1", 2117, "active")
-            checker:report_failure("127.0.0.1", 2113, "passive")
-            ngx.say(checker:get_target_status("127.0.0.1", 2117))  -- true
-            ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- true
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2117, nil))  -- true
+            ngx.say(checker:get_target_status("127.0.0.1", 2113, nil))  -- true
         }
     }
 --- request
@@ -239,9 +239,9 @@ true
 checking healthy targets: nothing to do
 checking unhealthy targets: nothing to do
 --- no_error_log
-unhealthy TCP increment (1/2) for 127.0.0.1:2117
-unhealthy TCP increment (2/2) for 127.0.0.1:2117
-event: target status '127.0.0.1:2117' from 'true' to 'false'
-unhealthy TCP increment (1/2) for 127.0.0.1:2113
-unhealthy TCP increment (2/2) for 127.0.0.1:2113
-event: target status '127.0.0.1:2113' from 'true' to 'false'
+unhealthy TCP increment (1/2) for '(127.0.0.1:2117)'
+unhealthy TCP increment (2/2) for '(127.0.0.1:2117)'
+event: target status '(127.0.0.1:2117)' from 'true' to 'false'
+unhealthy TCP increment (1/2) for '(127.0.0.1:2113)'
+unhealthy TCP increment (2/2) for '(127.0.0.1:2113)'
+event: target status '(127.0.0.1:2113)' from 'true' to 'false'

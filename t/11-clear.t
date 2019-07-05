@@ -164,7 +164,7 @@ GET /t
 true
 
 --- error_log
-unhealthy HTTP increment (1/3) for 127.0.0.1:21120
-unhealthy HTTP increment (2/3) for 127.0.0.1:21120
+unhealthy HTTP increment (1/3) for '(127.0.0.1:21120)'
+unhealthy HTTP increment (2/3) for '(127.0.0.1:21120)'
 --- no_error_log
-unhealthy HTTP increment (3/3) for 127.0.0.1:21120
+unhealthy HTTP increment (3/3) for '(127.0.0.1:21120)'
