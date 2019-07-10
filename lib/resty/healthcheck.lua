@@ -392,6 +392,7 @@ end
 --- Get the current status of the target.
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
+-- @param hostname the hostname of the target being checked.
 -- @return `true` if healthy, `false` if unhealthy, or `nil + error` on failure.
 function checker:get_target_status(ip, port, hostname)
 
