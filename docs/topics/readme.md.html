@@ -53,15 +53,16 @@
 
 <div id="content">
 
-    <h1>lua-resty-healthcheck</h1>
 
-<p><a href="https://travis-ci.org/Kong/lua-resty-healthcheck/branches"><img src="https://travis-ci.org/Kong/lua-resty-healthcheck.svg?branch=master" alt="Build Status" /></a></p>
+<h1>lua-resty-healthcheck</h1>
+
+<p><a href="https://travis-ci.org/Kong/lua-resty-healthcheck/branches"><img src="https://travis-ci.org/Kong/lua-resty-healthcheck.svg?branch=master" alt="Build Status"/></a></p>
 
 <p>A health check library for OpenResty.</p>
 
 <p><a name="Synopsis"></a></p>
-
 <h2>Synopsis</h2>
+
 
 <pre>
 http {
@@ -125,7 +126,6 @@ http {
 
 
 <p><a name="Description"></a></p>
-
 <h2>Description</h2>
 
 <p>This library supports performing active and passive health checks on arbitrary hosts.</p>
@@ -134,7 +134,7 @@ http {
 happens via the <a href="https://github.com/Kong/lua-resty-worker-events">lua-resty-worker-events</a> library.</p>
 
 <p>Targets are added using <code>checker:add_target(host, port)</code>.
-Changes in status (&ldquo;healthy&rdquo; or &ldquo;unhealthy&rdquo;) are broadcasted via worker-events.</p>
+Changes in status ("healthy" or "unhealthy") are broadcasted via worker-events.</p>
 
 <p>Active checks are executed in the background based on the specified timer intervals.</p>
 
@@ -145,82 +145,81 @@ programmatic API using functions such as <code>checker:report_http_status(host, 
 for the complete API.</p>
 
 <p><a name="History"></a></p>
-
 <h2>History</h2>
+
+<p>Versioning is strictly based on <a href="https://semver.org/">Semantic Versioning</a></p>
+
+<h3>1.0.0 (05-Jul-2019)</h3>
+<p> * BREAKING: all API functions related to hosts require a <code>hostname</code> argument
+   now. This way different hostnames listening on the same IP and ports
+   combination do not have an effect on each other.
+ * Fix: fix reporting active TCP probe successes
+   <a href="https://github.com/Kong/lua-resty-healthcheck/pull/20">#20</a>;
+   fixes issue <a href="https://github.com/Kong/lua-resty-healthcheck/issues/19">#19</a></p>
 
 <h3>0.6.1 (04-Apr-2019)</h3>
 
 <ul>
-<li>Fix: set up event callback only after target list is loaded
-<a href="https://github.com/Kong/lua-resty-healthcheck/pull/18">#18</a>;
-fixes Kong issue <a href="https://github.com/Kong/kong/issues/4453">#4453</a></li>
+    <li>Fix: set up event callback only after target list is loaded
+    <a href="https://github.com/Kong/lua-resty-healthcheck/pull/18">#18</a>;
+    fixes Kong issue <a href="https://github.com/Kong/kong/issues/4453">#4453</a></li>
 </ul>
-
 
 <h3>0.6.0 (26-Sep-2018)</h3>
 
 <ul>
-<li>Introduce <code>checks.active.https_verify_certificate</code> field.
-It is <code>true</code> by default; setting it to <code>false</code> disables certificate
-verification in active healthchecks over HTTPS.</li>
+    <li>Introduce <code>checks.active.https_verify_certificate</code> field.
+    It is <code>true</code> by default; setting it to <code>false</code> disables certificate
+    verification in active healthchecks over HTTPS.</li>
 </ul>
-
 
 <h3>0.5.0 (25-Jul-2018)</h3>
 
 <ul>
-<li>Add support for <code>https</code> &ndash; thanks @gaetanfl for the PR!</li>
-<li>Introduce separate <code>checks.active.type</code> and <code>checks.passive.type</code> fields;
-the top-level <a href="https://www.lua.org/manual/5.1/manual.html#pdf-type">type</a> field is still supported as a fallback but is now
-deprecated.</li>
+    <li>Add support for <code>https</code> -- thanks @gaetanfl for the PR!</li>
+    <li>Introduce separate <code>checks.active.type</code> and <code>checks.passive.type</code> fields;
+    the top-level <a href="https://www.lua.org/manual/5.3/manual.html#pdf-type">type</a> field is still supported as a fallback but is now
+    deprecated.</li>
 </ul>
-
 
 <h3>0.4.2 (23-May-2018)</h3>
 
 <ul>
-<li>Fix <code>Host</code> header in active healthchecks</li>
+    <li>Fix <code>Host</code> header in active healthchecks</li>
 </ul>
-
 
 <h3>0.4.1 (21-May-2018)</h3>
 
 <ul>
-<li>Fix internal management of healthcheck counters</li>
+    <li>Fix internal management of healthcheck counters</li>
 </ul>
-
 
 <h3>0.4.0 (20-Mar-2018)</h3>
 
 <ul>
-<li>Correct setting of defaults in <code>http_statuses</code></li>
-<li>Type and bounds checking to <code>checks</code> table</li>
+    <li>Correct setting of defaults in <code>http_statuses</code></li>
+    <li>Type and bounds checking to <code>checks</code> table</li>
 </ul>
-
 
 <h3>0.3.0 (18-Dec-2017)</h3>
 
 <ul>
-<li>Disable individual checks by setting their counters to 0</li>
+    <li>Disable individual checks by setting their counters to 0</li>
 </ul>
-
 
 <h3>0.2.0 (30-Nov-2017)</h3>
 
 <ul>
-<li>Adds <code>set_target_status</code></li>
+    <li>Adds <code>set_target_status</code></li>
 </ul>
-
 
 <h3>0.1.0 (27-Nov-2017) Initial release</h3>
 
 <ul>
-<li>Initial upload</li>
+    <li>Initial upload</li>
 </ul>
 
-
 <p><a name="Copyright_and_License"></a></p>
-
 <h2>Copyright and License</h2>
 
 <pre><code> Copyright 2017-2018 Kong Inc.
@@ -238,11 +237,14 @@ deprecated.</li>
  limitations under the License.
 </code></pre>
 
+
+
+
 </div> <!-- id="content" -->
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.6</a></i>
-<i style="float:right;">Last updated 2019-05-10 19:28:24 </i>
+<i style="float:right;">Last updated 2019-07-11 16:52:31 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
