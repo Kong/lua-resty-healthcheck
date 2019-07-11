@@ -70,10 +70,10 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2122, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
-            checker:report_timeout("127.0.0.1", 2122, "active")
-            checker:report_timeout("127.0.0.1", 2113, "passive")
-            checker:report_timeout("127.0.0.1", 2122, "active")
-            checker:report_timeout("127.0.0.1", 2113, "passive")
+            checker:report_timeout("127.0.0.1", 2122, nil, "active")
+            checker:report_timeout("127.0.0.1", 2113, nil, "passive")
+            checker:report_timeout("127.0.0.1", 2122, nil, "active")
+            checker:report_timeout("127.0.0.1", 2113, nil, "passive")
             ngx.say(checker:get_target_status("127.0.0.1", 2122))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- false
         }
@@ -86,12 +86,12 @@ false
 --- error_log
 checking healthy targets: nothing to do
 checking unhealthy targets: nothing to do
-unhealthy TIMEOUT increment (1/2) for 127.0.0.1:2122
-unhealthy TIMEOUT increment (2/2) for 127.0.0.1:2122
-event: target status '127.0.0.1:2122' from 'true' to 'false'
-unhealthy TIMEOUT increment (1/2) for 127.0.0.1:2113
-unhealthy TIMEOUT increment (2/2) for 127.0.0.1:2113
-event: target status '127.0.0.1:2113' from 'true' to 'false'
+unhealthy TIMEOUT increment (1/2) for '(127.0.0.1:2122)'
+unhealthy TIMEOUT increment (2/2) for '(127.0.0.1:2122)'
+event: target status '(127.0.0.1:2122)' from 'true' to 'false'
+unhealthy TIMEOUT increment (1/2) for '(127.0.0.1:2113)'
+unhealthy TIMEOUT increment (2/2) for '(127.0.0.1:2113)'
+event: target status '(127.0.0.1:2113)' from 'true' to 'false'
 
 
 === TEST 2: report_timeout() for active is a nop when active.unhealthy.timeouts == 0
@@ -144,9 +144,9 @@ qq{
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2122, nil, true)
-            checker:report_timeout("127.0.0.1", 2122, "active")
-            checker:report_timeout("127.0.0.1", 2122, "active")
-            checker:report_timeout("127.0.0.1", 2122, "active")
+            checker:report_timeout("127.0.0.1", 2122, nil, "active")
+            checker:report_timeout("127.0.0.1", 2122, nil, "active")
+            checker:report_timeout("127.0.0.1", 2122, nil, "active")
             ngx.say(checker:get_target_status("127.0.0.1", 2122))  -- true
         }
     }
@@ -159,7 +159,7 @@ checking healthy targets: nothing to do
 checking unhealthy targets: nothing to do
 --- no_error_log
 unhealthy TCP increment
-event: target status '127.0.0.1:2122' from 'true' to 'false'
+event: target status '(127.0.0.1:2122)' from 'true' to 'false'
 
 
 
@@ -213,9 +213,9 @@ qq{
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2122, nil, true)
-            checker:report_timeout("127.0.0.1", 2122, "passive")
-            checker:report_timeout("127.0.0.1", 2122, "passive")
-            checker:report_timeout("127.0.0.1", 2122, "passive")
+            checker:report_timeout("127.0.0.1", 2122, nil, "passive")
+            checker:report_timeout("127.0.0.1", 2122, nil, "passive")
+            checker:report_timeout("127.0.0.1", 2122, nil, "passive")
             ngx.say(checker:get_target_status("127.0.0.1", 2122))  -- true
         }
     }
@@ -228,4 +228,4 @@ checking healthy targets: nothing to do
 checking unhealthy targets: nothing to do
 --- no_error_log
 unhealthy TCP increment
-event: target status '127.0.0.1:2122' from 'true' to 'false'
+event: target status '(127.0.0.1:2122)' from 'true' to 'false'

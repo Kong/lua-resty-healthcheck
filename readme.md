@@ -86,8 +86,12 @@ for the complete API.
 
 ## History
 
-### 0.6.x (xx-xxx-2019)   UNRELEASED
+Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.0.0 (05-Jul-2019)
+ * BREAKING: all API functions related to hosts require a `hostname` argument
+   now. This way different hostnames listening on the same IP and ports
+   combination do not have an effect on each other.
  * Fix: fix reporting active TCP probe successes
    [#20](https://github.com/Kong/lua-resty-healthcheck/pull/20);
    fixes issue [#19](https://github.com/Kong/lua-resty-healthcheck/issues/19)

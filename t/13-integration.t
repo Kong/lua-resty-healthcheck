@@ -111,34 +111,34 @@ qq{
             -- and compares the results given by the library with a simple simulation
             -- that implements the specified behavior.
             local function run_test_case(case)
-                assert(checker:set_target_status(host, port, true))
+                assert(checker:set_target_status(host, port, nil, true))
                 local i = 1
                 local s, f, t, o = 0, 0, 0, 0
                 local mode = true
                 for c in case:gmatch(".") do
                     if c == "S" then
-                        checker:report_http_status(host, port, 200, "passive")
+                        checker:report_http_status(host, port, nil, 200, "passive")
                         s = s + 1
                         f, t, o = 0, 0, 0
                         if s == 2 then
                             mode = true
                         end
                     elseif c == "F" then
-                        checker:report_http_status(host, port, 500, "passive")
+                        checker:report_http_status(host, port, nil, 500, "passive")
                         f = f + 1
                         s = 0
                         if f == 2 then
                             mode = false
                         end
                     elseif c == "T" then
-                        checker:report_tcp_failure(host, port, "read", "passive")
+                        checker:report_tcp_failure(host, port, nil, "read", "passive")
                         t = t + 1
                         s = 0
                         if t == 2 then
                             mode = false
                         end
                     elseif c == "O" then
-                        checker:report_timeout(host, port, "passive")
+                        checker:report_timeout(host, port, nil, "passive")
                         o = o + 1
                         s = 0
                         if o == 2 then
@@ -146,11 +146,11 @@ qq{
                         end
                     end
 
-                    --local ctr, state = checker:test_get_counter(host, port)
+                    --local ctr, state = checker:test_get_counter(host, port, nil)
                     --ngx.say(case, ": ", c, " ", string.format("%08x", ctr), " ", state)
                     --ngx.log(ngx.DEBUG, case, ": ", c, " ", string.format("%08x", ctr), " ", state)
 
-                    if checker:get_target_status(host, port) ~= mode then
+                    if checker:get_target_status(host, port, nil) ~= mode then
                         ngx.say("failed: ", case, " step ", i, " expected ", mode)
                         return false
                     end

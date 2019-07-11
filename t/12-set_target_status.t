@@ -35,9 +35,9 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
-            checker:set_target_status("127.0.0.1", 2112, false)
+            checker:set_target_status("127.0.0.1", 2112, nil, false)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- false
-            checker:set_target_status("127.0.0.1", 2112, true)
+            checker:set_target_status("127.0.0.1", 2112, nil, true)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
         }
     }
@@ -73,10 +73,10 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
-            checker:report_http_status("127.0.0.1", 2112, 500)
-            checker:report_http_status("127.0.0.1", 2112, 500)
+            checker:report_http_status("127.0.0.1", 2112, nil, 500)
+            checker:report_http_status("127.0.0.1", 2112, nil, 500)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- false
-            checker:set_target_status("127.0.0.1", 2112, true)
+            checker:set_target_status("127.0.0.1", 2112, nil, true)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
         }
     }
@@ -115,11 +115,11 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
-            checker:report_http_status("127.0.0.1", 2112, 500)
-            checker:set_target_status("127.0.0.1", 2112, true)
-            checker:report_http_status("127.0.0.1", 2112, 500)
+            checker:report_http_status("127.0.0.1", 2112, nil, 500)
+            checker:set_target_status("127.0.0.1", 2112, nil, true)
+            checker:report_http_status("127.0.0.1", 2112, nil, 500)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
-            checker:report_http_status("127.0.0.1", 2112, 500)
+            checker:report_http_status("127.0.0.1", 2112, nil, 500)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- false
         }
     }
@@ -157,13 +157,13 @@ qq{
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
-            checker:set_target_status("127.0.0.1", 2112, false)
+            checker:set_target_status("127.0.0.1", 2112, nil, false)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- false
-            checker:report_http_status("127.0.0.1", 2112, 200)
-            checker:set_target_status("127.0.0.1", 2112, false)
-            checker:report_http_status("127.0.0.1", 2112, 200)
+            checker:report_http_status("127.0.0.1", 2112, nil, 200)
+            checker:set_target_status("127.0.0.1", 2112, nil, false)
+            checker:report_http_status("127.0.0.1", 2112, nil, 200)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- false
-            checker:report_http_status("127.0.0.1", 2112, 200)
+            checker:report_http_status("127.0.0.1", 2112, nil, 200)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
         }
     }
