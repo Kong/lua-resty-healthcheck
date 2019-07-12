@@ -6,6 +6,9 @@
 -- @author Hisham Muhammad, Thijs Schreijer
 -- @license Apache 2.0
 
+local assert = assert
+local type = type
+
 local timer_at = ngx.timer.at
 
 local _M = {}

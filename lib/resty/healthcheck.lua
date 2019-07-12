@@ -24,6 +24,7 @@
 -- @author Hisham Muhammad, Thijs Schreijer
 -- @license Apache 2.0
 
+local ngx = ngx
 local ERR = ngx.ERR
 local WARN = ngx.WARN
 local DEBUG = ngx.DEBUG
@@ -38,6 +39,17 @@ local resty_lock = require ("resty.lock")
 local re_find = ngx.re.find
 local bit = require("bit")
 local ngx_now = ngx.now
+local error = error
+local print = print
+local require = require
+local string = string
+local assert = assert
+local tonumber = tonumber
+local type = type
+local math = math
+local next = next
+local pairs = pairs
+local table = table
 
 -- constants
 local EVENT_SOURCE_PREFIX = "lua-resty-healthcheck"
@@ -503,8 +515,8 @@ local function incr_counter(self, health_report, ip, port, hostname, limit, ctr_
     local ctr = ctr_get(multictr, ctr_type)
 
     self:log(WARN, health_report, " ", COUNTER_NAMES[ctr_type],
-                   " increment (", ctr, "/", limit, ") for '", hostname or "",
-                   "(", ip, ":", port, ")'")
+             " increment (", ctr, "/", limit, ") for '", hostname or "",
+             "(", ip, ":", port, ")'")
 
     local new_multictr
     if ctr_type == CTR_SUCCESS then
@@ -1011,7 +1023,7 @@ end
 -- Log a message specific to this checker
 -- @param level standard ngx log level constant
 function checker:log(level, ...)
-  ngx_log(level, worker_color(self.LOG_PREFIX), ...)
+  return ngx_log(level, worker_color(self.LOG_PREFIX), ...)
 end
 
 
