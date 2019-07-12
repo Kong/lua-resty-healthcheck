@@ -72,6 +72,8 @@ initial target list (9 targets)
 initial target list (10 targets)
 initial target list (11 targets)
 
+
+
 === TEST 2: clear() clears the list, other checkers get notified and clear too
 --- http_config eval: $::HttpConfig
 --- config
@@ -114,6 +116,8 @@ checking unhealthy targets: nothing to do
 
 --- no_error_log
 checking unhealthy targets: #10
+
+
 
 === TEST 3: clear() resets counters
 --- http_config eval

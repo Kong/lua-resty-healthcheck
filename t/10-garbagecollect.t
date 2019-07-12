@@ -17,8 +17,6 @@ run_tests();
 
 __DATA__
 
-
-
 === TEST 1: garbage collect the checker object
 --- http_config eval
 qq{

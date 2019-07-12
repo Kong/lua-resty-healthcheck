@@ -47,6 +47,9 @@ GET /t
 true
 false
 true
+
+
+
 === TEST 2: set_target_status() restores node after passive check disables it
 --- http_config eval
 qq{
@@ -86,6 +89,9 @@ GET /t
 true
 false
 true
+
+
+
 === TEST 3: set_target_status() resets the failure counters
 --- http_config eval
 qq{
@@ -129,7 +135,10 @@ GET /t
 true
 true
 false
-=== TEST 3: set_target_status() resets the success counters
+
+
+
+=== TEST 4: set_target_status() resets the success counters
 --- http_config eval
 qq{
     $::HttpConfig

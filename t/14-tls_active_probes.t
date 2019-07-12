@@ -17,8 +17,6 @@ run_tests();
 
 __DATA__
 
-
-
 === TEST 1: active probes, valid https
 --- http_config eval: $::HttpConfig
 --- config
@@ -59,6 +57,8 @@ true
 --- timeout
 15
 
+
+
 === TEST 2: active probes, invalid cert
 --- http_config eval: $::HttpConfig
 --- config
@@ -98,6 +98,8 @@ GET /t
 false
 --- timeout
 15
+
+
 
 === TEST 3: active probes, accept invalid cert when disabling check
 --- http_config eval: $::HttpConfig

@@ -54,6 +54,8 @@ true
 --- no_error_log
 [error]
 
+
+
 === TEST 2: start() cannot start a second time using active health checks
 --- http_config eval: $::HttpConfig
 --- config
@@ -86,6 +88,8 @@ GET /t
 cannot start, 2 (of 2) timers are still running
 --- no_error_log
 [error]
+
+
 
 === TEST 3: start() is a no-op if active intervals are 0
 --- http_config eval: $::HttpConfig
@@ -128,6 +132,8 @@ true
 --- no_error_log
 [error]
 
+
+
 === TEST 4: stop() stops health checks
 --- http_config eval: $::HttpConfig
 --- config
@@ -166,6 +172,8 @@ true
 --- no_error_log
 [error]
 checking
+
+
 
 === TEST 5: start() restarts health checks
 --- http_config eval: $::HttpConfig

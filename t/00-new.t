@@ -34,6 +34,8 @@ GET /t
 --- error_log
 please configure
 
+
+
 === TEST 2: new() requires 'name'
 --- http_config eval: $::HttpConfig
 --- config
@@ -55,6 +57,8 @@ GET /t
 --- error_log
 required option 'name' is missing
 
+
+
 === TEST 3: new() requires 'shm_name'
 --- http_config eval: $::HttpConfig
 --- config
@@ -75,6 +79,8 @@ GET /t
 
 --- error_log
 required option 'shm_name' is missing
+
+
 
 === TEST 4: new() fails with invalid shm
 --- http_config eval: $::HttpConfig
@@ -98,6 +104,8 @@ GET /t
 --- error_log
 no shm found by name
 
+
+
 === TEST 5: new() initializes with default config
 --- http_config eval: $::HttpConfig
 --- config
@@ -118,6 +126,8 @@ GET /t
 
 --- error_log
 Healthchecker started!
+
+
 
 === TEST 6: new() only accepts http or tcp types
 --- http_config eval: $::HttpConfig
@@ -153,6 +163,8 @@ GET /t
 true
 true
 false
+
+
 
 === TEST 7: new() deals with bad inputs
 --- http_config eval: $::HttpConfig

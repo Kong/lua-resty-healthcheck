@@ -17,8 +17,6 @@ run_tests();
 
 __DATA__
 
-
-
 === TEST 1: report_tcp_failure() active + passive
 --- http_config eval
 qq{
@@ -94,6 +92,7 @@ unhealthy TCP increment (1/3) for '(127.0.0.1:2113)'
 unhealthy TCP increment (2/3) for '(127.0.0.1:2113)'
 unhealthy TCP increment (3/3) for '(127.0.0.1:2113)'
 event: target status '(127.0.0.1:2113)' from 'true' to 'false'
+
 
 
 === TEST 2: report_tcp_failure() for active is a nop when active.unhealthy.tcp_failures == 0

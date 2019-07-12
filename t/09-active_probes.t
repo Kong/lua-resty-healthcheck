@@ -17,8 +17,6 @@ run_tests();
 
 __DATA__
 
-
-
 === TEST 1: active probes, http node failing
 --- http_config eval
 qq{
@@ -127,6 +125,8 @@ healthy SUCCESS increment (3/3) for '(127.0.0.1:2114)'
 event: target status '(127.0.0.1:2114)' from 'false' to 'true'
 checking unhealthy targets: nothing to do
 
+
+
 === TEST 3: active probes, custom http status (regression test for pre-filled defaults)
 --- http_config eval
 qq{
@@ -181,6 +181,7 @@ unhealthy HTTP increment (1/3) for '(127.0.0.1:2114)'
 unhealthy HTTP increment (2/3) for '(127.0.0.1:2114)'
 unhealthy HTTP increment (3/3) for '(127.0.0.1:2114)'
 event: target status '(127.0.0.1:2114)' from 'true' to 'false'
+
 
 
 === TEST 4: active probes, custom http status, node failing
@@ -295,6 +296,7 @@ event: target status 'example.com(127.0.0.1:2114)' from 'false' to 'true'
 checking unhealthy targets: nothing to do
 
 
+
 === TEST 6: active probes, tcp node failing
 --- http_config eval
 qq{
@@ -395,4 +397,3 @@ healthy SUCCESS increment (2/3) for '(127.0.0.1:2114)'
 healthy SUCCESS increment (3/3) for '(127.0.0.1:2114)'
 event: target status '(127.0.0.1:2114)' from 'false' to 'true'
 checking unhealthy targets: nothing to do
-

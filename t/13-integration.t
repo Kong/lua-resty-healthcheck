@@ -17,8 +17,6 @@ run_tests();
 
 __DATA__
 
-
-
 === TEST 1: ensure counters work properly
 --- http_config eval
 qq{
