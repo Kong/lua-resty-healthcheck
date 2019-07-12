@@ -17,7 +17,7 @@ our $HttpConfig = qq{
     lua_shared_dict test_shm 8m;
     lua_shared_dict my_worker_events 8m;
 
-    lua_ssl_trusted_certificate "$ca_certs";
+    lua_ssl_trusted_certificate $ca_certs;
 };
 
 run_tests();
