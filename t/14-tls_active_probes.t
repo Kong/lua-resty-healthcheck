@@ -6,11 +6,18 @@ workers(1);
 plan tests => blocks() * 2;
 
 my $pwd = cwd();
+my $ca_certs = '/etc/ssl/certs/ca-certificates.crt';
+if (!-e $ca_certs) {
+    # for centos or redhat
+    $ca_certs = '/etc/ssl/certs/ca-bundle.trust.crt';
+}
 
 our $HttpConfig = qq{
     lua_package_path "$pwd/lib/?.lua;;";
     lua_shared_dict test_shm 8m;
     lua_shared_dict my_worker_events 8m;
+
+    lua_ssl_trusted_certificate "$ca_certs";
 };
 
 run_tests();
@@ -21,7 +28,6 @@ __DATA__
 --- http_config eval: $::HttpConfig
 --- config
     location = /t {
-        lua_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
         lua_ssl_verify_depth 2;
         content_by_lua_block {
             local we = require "resty.worker.events"
@@ -63,7 +69,6 @@ true
 --- http_config eval: $::HttpConfig
 --- config
     location = /t {
-        lua_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
         lua_ssl_verify_depth 2;
         content_by_lua_block {
             local we = require "resty.worker.events"
@@ -105,7 +110,6 @@ false
 --- http_config eval: $::HttpConfig
 --- config
     location = /t {
-        lua_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
         lua_ssl_verify_depth 2;
         content_by_lua_block {
             local we = require "resty.worker.events"
