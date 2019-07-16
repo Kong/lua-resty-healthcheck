@@ -983,13 +983,19 @@ function checker:event_handler(event_name, ip, port, hostname)
       self.targets[#self.targets + 1] = target_found
       self:log(DEBUG, "event: target added '", hostname or "", "(", ip, ":", port, ")'")
     end
-    do
-      local from = target_found.internal_health
-      local to = event_name
-      self:log(DEBUG, "event: target status '", hostname or "", "(", ip, ":", port,
-                      ")' from '", from == "healthy" or from == "mostly_healthy",
-                      "' to '",   to   == "healthy" or to   == "mostly_healthy", "'")
+
+    local from_status = target_found.internal_health
+    local to_status = event_name
+    local from = from_status == "healthy" or from_status == "mostly_healthy"
+    local to = to_status == "healthy" or to_status == "mostly_healthy"
+
+    if from ~= to then
+        self.status_ver = self.status_ver + 1
     end
+
+    self:log(DEBUG, "event: target status '", hostname or "", "(", ip, ":",
+             port, ")' from '", from, "' to '", to, "', ver: ", self.status_ver)
+
     target_found.internal_health = event_name
 
   elseif event_name == self.events.clear then
@@ -1122,6 +1128,7 @@ local defaults = {
   name = NO_DEFAULT,
   shm_name = NO_DEFAULT,
   type = NO_DEFAULT,
+  status_ver = 0,
   checks = {
     active = {
       type = "http",

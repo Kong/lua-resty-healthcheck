@@ -48,7 +48,7 @@ __DATA__
     location = /t {
         content_by_lua_block {
             ngx.say(true)
-            ngx.sleep(0.5) -- wait twice the interval
+            ngx.sleep(0.3) -- wait twice the interval
         }
     }
 --- request
@@ -58,3 +58,5 @@ true
 --- error_log
 checking unhealthy targets: nothing to do
 checking unhealthy targets: #1
+from 'true' to 'false', ver: 2
+from 'true' to 'false', ver: 1
