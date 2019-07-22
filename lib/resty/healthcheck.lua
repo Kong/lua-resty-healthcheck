@@ -486,13 +486,6 @@ local function incr_counter(self, health_report, ip, port, hostname, limit, ctr_
     return true
   end
 
-  local current_health = target.internal_health
-  if health_report == current_health then
-    -- No need to count successes when internal health is fully "healthy"
-    -- or failures when internal health is fully "unhealthy"
-    return true
-  end
-
   return locking_target(self, ip, port, hostname, function()
     local counter_key = key_for(self.TARGET_COUNTER, ip, port, hostname)
     local multictr, err = self.shm:incr(counter_key, ctr_type, 0)
@@ -517,6 +510,13 @@ local function incr_counter(self, health_report, ip, port, hostname, limit, ctr_
       self.shm:set(counter_key, new_multictr)
     end
 
+    local current_health = target.internal_health
+    if health_report == current_health then
+      -- No need to count successes when internal health is fully "healthy"
+      -- or failures when internal health is fully "unhealthy"
+      return true
+    end
+  
     local new_health
     if ctr >= limit then
       new_health = health_report
