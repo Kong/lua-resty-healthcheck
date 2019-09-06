@@ -756,10 +756,11 @@ function checker:run_single_check(ip, port, hostname)
 
   if self.checks.active.type == "https" then
     local session
-    session = sock:sslhandshake(nil, hostname,
+    session, err = sock:sslhandshake(nil, hostname,
                                      self.checks.active.https_verify_certificate)
     if not session then
       sock:close()
+      self:log(ERR, "failed SSL handshake with '", hostname, " (", ip, ":", port, ")': ", err)
       return self:report_tcp_failure(ip, port, hostname, "connect", "active")
     end
   end
