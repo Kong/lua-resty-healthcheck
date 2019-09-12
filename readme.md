@@ -88,6 +88,10 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.0.x (unreleased)
+ * Fix: log error on SSL Handshake failure
+   [#28](https://github.com/Kong/lua-resty-healthcheck/pull/28);
+   
 ### 1.0.0 (05-Jul-2019)
  * BREAKING: all API functions related to hosts require a `hostname` argument
    now. This way different hostnames listening on the same IP and ports
