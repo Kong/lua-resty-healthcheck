@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * (blocks() * 5) + 2;
+plan tests => repeat_each() * (blocks() * 5) + 3;
 
 my $pwd = cwd();
 
@@ -56,13 +56,13 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2115, "ahostname", true)
-            local ok, err = checker:add_target("127.0.0.1", 2115, "otherhostname", true)
+            local ok, err = checker:add_target("127.0.0.1", 2115, "ahostname", nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2115, "otherhostname", nil, true)
             ngx.say(checker:get_target_status("127.0.0.1", 2115, "ahostname"))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2115, "otherhostname"))  -- true
-            checker:report_http_status("127.0.0.1", 2115, "otherhostname", 500, "passive")
+            checker:report_http_status("127.0.0.1", 2115, "otherhostname", nil, 500, "passive")
             ngx.say(checker:get_target_status("127.0.0.1", 2115, "otherhostname"))  -- true
-            checker:report_http_status("127.0.0.1", 2115, "otherhostname", 500, "passive")
+            checker:report_http_status("127.0.0.1", 2115, "otherhostname", nil, 500, "passive")
             ngx.say(checker:get_target_status("127.0.0.1", 2115, "otherhostname"))  -- false
             checker:report_success("127.0.0.1", 2115, "otherhostname")
             ngx.say(checker:get_target_status("127.0.0.1", 2115, "otherhostname"))  -- true
@@ -130,11 +130,11 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2116, "ahostname", true)
-            local ok, err = checker:add_target("127.0.0.1", 2116, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2116, "ahostname", nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2116, nil, nil, true)
             ngx.say(checker:get_target_status("127.0.0.1", 2116, "ahostname"))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2116))  -- true
-            checker:report_http_status("127.0.0.1", 2116, nil, 500, "passive")
+            checker:report_http_status("127.0.0.1", 2116, nil, nil, 500, "passive")
             ngx.say(checker:get_target_status("127.0.0.1", 2116, "ahostname"))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2116)) -- false
         }
@@ -195,8 +195,8 @@ qq{
                     },
                 }
             })
-            local ok, err = checker:add_target("127.0.0.1", 2117, "healthyserver", true)
-            local ok, err = checker:add_target("127.0.0.1", 2117, "unhealthyserver", true)
+            local ok, err = checker:add_target("127.0.0.1", 2117, "healthyserver", nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2117, "unhealthyserver", nil, true)
             ngx.sleep(0.5) -- wait for 5x the check interval
             ngx.say(checker:get_target_status("127.0.0.1", 2117, "healthyserver"))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2117, "unhealthyserver"))  -- false
@@ -258,18 +258,18 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2118, "127.0.0.1", true)
-            local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2118, "127.0.0.1", nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2119, nil, nil, true)
             ngx.say(checker:get_target_status("127.0.0.1", 2118, "127.0.0.1"))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2118))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2119, "127.0.0.1"))  -- true
-            checker:report_http_status("127.0.0.1", 2118, nil, 500, "passive")
+            checker:report_http_status("127.0.0.1", 2118, nil, nil, 500, "passive")
             ngx.say(checker:get_target_status("127.0.0.1", 2118, "127.0.0.1"))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2118))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2119, "127.0.0.1"))  -- true
-            checker:report_http_status("127.0.0.1", 2119, "127.0.0.1", 500, "passive")
+            checker:report_http_status("127.0.0.1", 2119, "127.0.0.1", nil, 500, "passive")
             ngx.say(checker:get_target_status("127.0.0.1", 2118, "127.0.0.1"))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2118))  -- false
@@ -296,3 +296,81 @@ unhealthy HTTP increment (1/1) for '(127.0.0.1:2118)'
 event: target status '(127.0.0.1:2118)' from 'true' to 'false'
 unhealthy HTTP increment (1/1) for '127.0.0.1(127.0.0.1:2119)'
 event: target status '127.0.0.1(127.0.0.1:2119)' from 'true' to 'false'
+
+
+=== TEST 5: get_target_status() reports proper status for different custom hostnames
+--- http_config eval
+qq{
+    $::HttpConfig
+}
+--- config
+    location = /t {
+        content_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+            local checker = healthcheck.new({
+                name = "testing",
+                shm_name = "test_shm",
+                checks = {
+                    active = {
+                        http_path = "/status",
+                        healthy  = {
+                            interval = 999, -- we don't want active checks
+                            successes = 1,
+                        },
+                        unhealthy  = {
+                            interval = 999, -- we don't want active checks
+                            tcp_failures = 1,
+                            http_failures = 1,
+                        }
+                    },
+                    passive = {
+                        healthy  = {
+                            successes = 1,
+                        },
+                        unhealthy  = {
+                            tcp_failures = 1,
+                            http_failures = 1,
+                        }
+                    }
+                }
+            })
+            ngx.sleep(0.1) -- wait for initial timers to run once
+            local ok, err = checker:add_target("127.0.0.1", 2118, "localhost", nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2118, "localhost", "custom", true)
+            ngx.say(checker:get_target_status("127.0.0.1", 2118, "localhost"))  -- true
+            ngx.say(checker:get_target_status("127.0.0.1", 2118, "localhost", "custom"))  -- true
+            checker:report_http_status("127.0.0.1", 2118, "localhost", nil, 500, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2118, "localhost", nil))  -- false
+            ngx.say(checker:get_target_status("127.0.0.1", 2118, "localhost", "custom"))  -- true
+            checker:report_http_status("127.0.0.1", 2118, "localhost", "custom", 500, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2118, "localhost", nil))  -- false
+            ngx.say(checker:get_target_status("127.0.0.1", 2118, "localhost", "custom"))  -- false
+            checker:report_http_status("127.0.0.1", 2118, "localhost", nil, 200, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2118, "localhost", nil))  -- true
+            ngx.say(checker:get_target_status("127.0.0.1", 2118, "localhost", "custom"))  -- false
+            checker:report_http_status("127.0.0.1", 2118, "localhost", "custom", 200, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2118, "localhost", nil))  -- true
+            ngx.say(checker:get_target_status("127.0.0.1", 2118, "localhost", "custom"))  -- true
+        }
+    }
+--- request
+GET /t
+--- response_body
+true
+true
+false
+true
+false
+false
+true
+false
+true
+true
+--- error_log
+unhealthy HTTP increment (1/1) for 'localhost(127.0.0.1:2118)'
+event: target status 'localhost(127.0.0.1:2118)' from 'true' to 'false'
+unhealthy HTTP increment (1/1) for 'localhost(as custom)(127.0.0.1:2118)'
+target status 'localhost (as custom) (127.0.0.1:2118)' from 'true' to 'false'
+

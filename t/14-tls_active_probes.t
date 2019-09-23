@@ -47,7 +47,7 @@ __DATA__
                     },
                 }
             })
-            local ok, err = checker:add_target("104.154.89.105", 443, "badssl.com", false)
+            local ok, err = checker:add_target("104.154.89.105", 443, "badssl.com", nil, false)
             ngx.sleep(8) -- wait for 4x the check interval
             ngx.say(checker:get_target_status("104.154.89.105", 443, "badssl.com"))  -- true
         }
@@ -87,7 +87,7 @@ true
                     },
                 }
             })
-            local ok, err = checker:add_target("104.154.89.105", 443, "wrong.host.badssl.com", true)
+            local ok, err = checker:add_target("104.154.89.105", 443, "wrong.host.badssl.com", nil, true)
             ngx.sleep(8) -- wait for 4x the check interval
             ngx.say(checker:get_target_status("104.154.89.105", 443, "wrong.host.badssl.com"))  -- false
         }
@@ -128,7 +128,7 @@ false
                     },
                 }
             })
-            local ok, err = checker:add_target("104.154.89.105", 443, "wrong.host.badssl.com", false)
+            local ok, err = checker:add_target("104.154.89.105", 443, "wrong.host.badssl.com", nil, false)
             ngx.sleep(8) -- wait for 4x the check interval
             ngx.say(checker:get_target_status("104.154.89.105", 443, "wrong.host.badssl.com"))  -- true
         }

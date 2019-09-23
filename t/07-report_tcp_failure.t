@@ -66,14 +66,14 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2120, nil, true)
-            local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
-            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, "active")
-            checker:report_tcp_failure("127.0.0.1", 2113, nil, nil, "passive")
-            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, "active")
-            checker:report_tcp_failure("127.0.0.1", 2113, nil, nil, "passive")
-            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, "active")
-            checker:report_tcp_failure("127.0.0.1", 2113, nil, nil, "passive")
+            local ok, err = checker:add_target("127.0.0.1", 2120, nil, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2113, nil, nil, true)
+            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, nil, "active")
+            checker:report_tcp_failure("127.0.0.1", 2113, nil, nil, nil, "passive")
+            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, nil, "active")
+            checker:report_tcp_failure("127.0.0.1", 2113, nil, nil, nil, "passive")
+            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, nil, "active")
+            checker:report_tcp_failure("127.0.0.1", 2113, nil, nil, nil, "passive")
             ngx.say(checker:get_target_status("127.0.0.1", 2120))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- false
         }
@@ -143,10 +143,10 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2120, nil, true)
-            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, "active")
-            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, "active")
-            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, "active")
+            local ok, err = checker:add_target("127.0.0.1", 2120, nil, nil, true)
+            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, nil, "active")
+            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, nil, "active")
+            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, nil, "active")
             ngx.say(checker:get_target_status("127.0.0.1", 2120))  -- true
         }
     }
@@ -210,10 +210,10 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2120, nil, true)
-            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, "passive")
-            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, "passive")
-            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, "passive")
+            local ok, err = checker:add_target("127.0.0.1", 2120, nil, nil, true)
+            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, nil, "passive")
+            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, nil, "passive")
+            checker:report_tcp_failure("127.0.0.1", 2120, nil, nil, nil, "passive")
             ngx.say(checker:get_target_status("127.0.0.1", 2120))  -- true
         }
     }

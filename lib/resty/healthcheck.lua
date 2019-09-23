@@ -149,8 +149,10 @@ local function deserialize(s)
 end
 
 
-local function key_for(key_prefix, ip, port, hostname)
-  return string.format("%s:%s:%s%s", key_prefix, ip, port, hostname and ":" .. hostname or "")
+local function key_for(key_prefix, ip, port, hostname, custom_hostname)
+  return string.format("%s:%s:%s%s%s", key_prefix, ip, port, 
+                       hostname and ":" .. hostname or "",
+                       custom_hostname and ":" .. custom_hostname or "")
 end
 
 
@@ -220,9 +222,10 @@ end
 
 
 --- Get a target
-local function get_target(self, ip, port, hostname)
+local function get_target(self, ip, port, hostname, custom_hostname)
   hostname = hostname or ip
-  return ((self.targets[ip] or EMPTY)[port] or EMPTY)[hostname]
+  custom_hostname = custom_hostname or ip
+  return (((self.targets[ip] or EMPTY)[port] or EMPTY)[hostname] or EMPTY)[custom_hostname]
 end
 
 --- Add a target to the healthchecker.
@@ -230,12 +233,13 @@ end
 -- return success (without updating `is_healthy` status).
 -- @param ip IP address of the target to check.
 -- @param port the port to check against.
--- @param hostname (optional) hostname to set as the host header in the HTTP
--- probe request
+-- @param hostname (optional) target hostname
+-- @param custom_hostname (optional) hostname to set as the host header in the HTTP
+-- probe request (overrides previous hostname)
 -- @param is_healthy (optional) a boolean value indicating the initial state,
 -- default is `true`.
 -- @return `true` on success, or `nil + error` on failure.
-function checker:add_target(ip, port, hostname, is_healthy)
+function checker:add_target(ip, port, hostname, custom_hostname, is_healthy)
   ip = tostring(assert(ip, "no ip address provided"))
   port = assert(tonumber(port), "no port number provided")
   if is_healthy == nil then
@@ -248,8 +252,13 @@ function checker:add_target(ip, port, hostname, is_healthy)
 
     -- check whether we already have this target
     for _, target in ipairs(target_list) do
-      if target.ip == ip and target.port == port and target.hostname == hostname then
-        self:log(DEBUG, "adding an existing target: ", hostname or "", " ", ip,
+      if target.ip == ip and
+         target.port == port and 
+         target.hostname == hostname and
+         target.custom_hostname == custom_hostname
+      then
+        self:log(DEBUG, "adding an existing target: ", hostname or "", " ", 
+                custom_hostname and "(".. custom_hostname .. ") " or "", ip,
                 ":", port, " (ignoring)")
         return false
       end
@@ -258,7 +267,8 @@ function checker:add_target(ip, port, hostname, is_healthy)
     -- we first add the internal health, and only then the updated list.
     -- this prevents a state where a target is in the list, but does not
     -- have a key in the shm.
-    local ok, err = self.shm:set(key_for(self.TARGET_STATE, ip, port, hostname),
+    local ok, err = self.shm:set(key_for(self.TARGET_STATE, ip, port, hostname,
+                                         custom_hostname),
                                  INTERNAL_STATES[internal_health])
     if not ok then
       self:log(ERR, "failed to set initial health status in shm: ", err)
@@ -269,6 +279,7 @@ function checker:add_target(ip, port, hostname, is_healthy)
       ip = ip,
       port = port,
       hostname = hostname,
+      custom_hostname = custom_hostname,
     }
     target_list = serialize(target_list)
 
@@ -278,7 +289,7 @@ function checker:add_target(ip, port, hostname, is_healthy)
     end
 
     -- raise event for our newly added target
-    self:raise_event(self.events[internal_health], ip, port, hostname)
+    self:raise_event(self.events[internal_health], ip, port, hostname, custom_hostname)
 
     return true
   end)
@@ -298,12 +309,13 @@ end
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 -- @param hostname hostname of the target being checked.
-local function clear_target_data_from_shm(self, ip, port, hostname)
-    local ok, err = self.shm:set(key_for(self.TARGET_STATE, ip, port, hostname), nil)
+-- @param custom_hostname target's HTTP hostname
+local function clear_target_data_from_shm(self, ip, port, hostname, custom_hostname)
+    local ok, err = self.shm:set(key_for(self.TARGET_STATE, ip, port, hostname, custom_hostname), nil)
     if not ok then
       self:log(ERR, "failed to remove health status from shm: ", err)
     end
-    ok, err = self.shm:set(key_for(self.TARGET_COUNTER, ip, port, hostname), nil)
+    ok, err = self.shm:set(key_for(self.TARGET_COUNTER, ip, port, hostname, custom_hostname), nil)
     if not ok then
       self:log(ERR, "failed to clear health counter from shm: ", err)
     end
@@ -315,8 +327,9 @@ end
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 -- @param hostname (optional) hostname of the target being checked.
+-- @param custom_hostname (optional) target's HTTP hostname
 -- @return `true` on success, or `nil + error` on failure.
-function checker:remove_target(ip, port, hostname)
+function checker:remove_target(ip, port, hostname, custom_hostname)
   ip   = tostring(assert(ip, "no ip address provided"))
   port = assert(tonumber(port), "no port number provided")
 
@@ -325,7 +338,9 @@ function checker:remove_target(ip, port, hostname)
     -- find the target
     local target_found
     for i, target in ipairs(target_list) do
-      if target.ip == ip and target.port == port and target.hostname == hostname then
+      if target.ip == ip and target.port == port and 
+         target.hostname == hostname and target.custom_hostname == custom_hostname
+      then
         target_found = target
         table_remove(target_list, i)
         break
@@ -347,10 +362,10 @@ function checker:remove_target(ip, port, hostname)
       return nil, "failed to store target_list in shm: " .. err
     end
 
-    clear_target_data_from_shm(self, ip, port, hostname)
+    clear_target_data_from_shm(self, ip, port, hostname, custom_hostname)
 
     -- raise event for our removed target
-    self:raise_event(self.events.remove, ip, port, hostname)
+    self:raise_event(self.events.remove, ip, port, hostname, custom_hostname)
 
     return true
   end)
@@ -375,8 +390,11 @@ function checker:clear()
 
     -- remove all individual statuses
     for _, target in ipairs(old_target_list) do
-      local ip, port, hostname = target.ip, target.port, target.hostname
-      clear_target_data_from_shm(self, ip, port, hostname)
+      local ip = target.ip
+      local port = target.port
+      local hostname = target.hostname
+      local custom_hostname = target.custom_hostname
+      clear_target_data_from_shm(self, ip, port, hostname, custom_hostname)
     end
 
     self.targets = {}
@@ -393,10 +411,11 @@ end
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 -- @param hostname the hostname of the target being checked.
+-- @param custom_hostname target's HTTP hostname
 -- @return `true` if healthy, `false` if unhealthy, or `nil + error` on failure.
-function checker:get_target_status(ip, port, hostname)
+function checker:get_target_status(ip, port, hostname, custom_hostname)
 
-  local target = get_target(self, ip, port, hostname)
+  local target = get_target(self, ip, port, hostname, custom_hostname)
   if not target then
     return nil, "target not found"
   end
@@ -420,10 +439,11 @@ end
 -- @param ip Target IP
 -- @param port Target port
 -- @param hostname Target hostname
+-- @param custom_hostname target's HTTP hostname
 -- @param fn The function to execute
 -- @return The results of the function; or nil and an error message
 -- in case it fails locking.
-local function locking_target(self, ip, port, hostname, fn)
+local function locking_target(self, ip, port, hostname, custom_hostname, fn)
   local lock, lock_err = resty_lock:new(self.shm_name, {
                   exptime = 10,  -- timeout after which lock is released anyway
                   timeout = 5,   -- max wait time to acquire lock
@@ -431,7 +451,7 @@ local function locking_target(self, ip, port, hostname, fn)
   if not lock then
     return nil, "failed to create lock:" .. lock_err
   end
-  local lock_key = key_for(self.TARGET_LOCK, ip, port, hostname)
+  local lock_key = key_for(self.TARGET_LOCK, ip, port, hostname, custom_hostname)
 
   local ok, err = lock:lock(lock_key)
   if not ok then
@@ -468,21 +488,24 @@ end
 -- @param ip Target IP
 -- @param port Target port
 -- @param hostname Target hostname
+-- @param custom_hostname Target's HTTP hostname
 -- @param limit the limit after which target status is changed
 -- @param ctr_type the counter to increment, see CTR_xxx constants
 -- @return True if succeeded, or nil and an error message.
-local function incr_counter(self, health_report, ip, port, hostname, limit, ctr_type)
-
+local function incr_counter(self, health_report, ip, port, hostname, custom_hostname,
+                            limit, ctr_type)
   -- fail fast on counters that are disabled by configuration
   if limit == 0 then
     return true
   end
 
   port = tonumber(port)
-  local target = get_target(self, ip, port, hostname)
+  local target = get_target(self, ip, port, hostname, custom_hostname)
   if not target then
     -- sync issue: warn, but return success
-    self:log(WARN, "trying to increment a target that is not in the list: ", ip, ":", port)
+    self:log(WARN, "trying to increment a target that is not in the list: ", 
+                    hostname or "", custom_hostname and " (" .. custom_hostname .. ") ",
+                    ip, ":", port)
     return true
   end
 
@@ -493,8 +516,8 @@ local function incr_counter(self, health_report, ip, port, hostname, limit, ctr_
     return true
   end
 
-  return locking_target(self, ip, port, hostname, function()
-    local counter_key = key_for(self.TARGET_COUNTER, ip, port, hostname)
+  return locking_target(self, ip, port, hostname, custom_hostname, function()
+    local counter_key = key_for(self.TARGET_COUNTER, ip, port, hostname, custom_hostname)
     local multictr, err = self.shm:incr(counter_key, ctr_type, 0)
     if err then
       return nil, err
@@ -504,6 +527,7 @@ local function incr_counter(self, health_report, ip, port, hostname, limit, ctr_
 
     self:log(WARN, health_report, " ", COUNTER_NAMES[ctr_type],
                    " increment (", ctr, "/", limit, ") for '", hostname or "",
+                   custom_hostname and "(as " .. custom_hostname .. ")" or "",
                    "(", ip, ":", port, ")'")
 
     local new_multictr
@@ -527,9 +551,9 @@ local function incr_counter(self, health_report, ip, port, hostname, limit, ctr_
     end
 
     if new_health and new_health ~= current_health then
-      local state_key = key_for(self.TARGET_STATE, ip, port, hostname)
+      local state_key = key_for(self.TARGET_STATE, ip, port, hostname, custom_hostname)
       self.shm:set(state_key, INTERNAL_STATES[new_health])
-      self:raise_event(self.events[new_health], ip, port, hostname)
+      self:raise_event(self.events[new_health], ip, port, hostname, custom_hostname)
     end
 
     return true
@@ -549,9 +573,10 @@ end
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 -- @param hostname (optional) hostname of the target being checked.
+-- @param custom_hostname (optional) target's HTTP hostname
 -- @param check (optional) the type of check, either "passive" or "active", default "passive".
 -- @return `true` on success, or `nil + error` on failure.
-function checker:report_failure(ip, port, hostname, check)
+function checker:report_failure(ip, port, hostname, custom_hostname, check)
 
   local checks = self.checks[check or "passive"]
   local limit, ctr_type
@@ -563,7 +588,7 @@ function checker:report_failure(ip, port, hostname, check)
     ctr_type = CTR_HTTP
   end
 
-  return incr_counter(self, "unhealthy", ip, port, hostname, limit, ctr_type)
+  return incr_counter(self, "unhealthy", ip, port, hostname, custom_hostname, limit, ctr_type)
 
 end
 
@@ -576,13 +601,14 @@ end
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 -- @param hostname (optional) hostname of the target being checked.
+-- @param custom_hostname (optional) target's HTTP hostname
 -- @param check (optional) the type of check, either "passive" or "active", default "passive".
 -- @return `true` on success, or `nil + error` on failure.
-function checker:report_success(ip, port, hostname, check)
+function checker:report_success(ip, port, hostname, custom_hostname, check)
 
   local limit = self.checks[check or "passive"].healthy.successes
 
-  return incr_counter(self, "healthy", ip, port, hostname, limit, CTR_SUCCESS)
+  return incr_counter(self, "healthy", ip, port, hostname, custom_hostname, limit, CTR_SUCCESS)
 
 end
 
@@ -597,11 +623,12 @@ end
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 -- @param hostname (optional) hostname of the target being checked.
+-- @param custom_hostname (optional) target's HTTP hostname
 -- @param http_status the http statuscode, or nil to report an invalid http response.
 -- @param check (optional) the type of check, either "passive" or "active", default "passive".
 -- @return `true` on success, `nil` if the status was ignored (not in active or
 -- passive health check lists) or `nil + error` on failure.
-function checker:report_http_status(ip, port, hostname, http_status, check)
+function checker:report_http_status(ip, port, hostname, custom_hostname, http_status, check)
   http_status = tonumber(http_status) or 0
 
   local checks = self.checks[check or "passive"]
@@ -620,7 +647,7 @@ function checker:report_http_status(ip, port, hostname, http_status, check)
     return
   end
 
-  return incr_counter(self, status_type, ip, port, hostname, limit, ctr)
+  return incr_counter(self, status_type, ip, port, hostname, custom_hostname, limit, ctr)
 
 end
 
@@ -630,6 +657,7 @@ end
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 -- @param hostname hostname of the target being checked.
+-- @param custom_hostname target's HTTP hostname
 -- @param operation The socket operation that failed:
 -- "connect", "send" or "receive".
 -- TODO check what kind of information we get from the OpenResty layer
@@ -637,12 +665,12 @@ end
 -- https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/balancer.md#get_last_failure
 -- @param check (optional) the type of check, either "passive" or "active", default "passive".
 -- @return `true` on success, or `nil + error` on failure.
-function checker:report_tcp_failure(ip, port, hostname, operation, check)
+function checker:report_tcp_failure(ip, port, hostname, custom_hostname, operation, check)
 
   local limit = self.checks[check or "passive"].unhealthy.tcp_failures
 
   -- TODO what do we do with the `operation` information
-  return incr_counter(self, "unhealthy", ip, port, hostname, limit, CTR_TCP)
+  return incr_counter(self, "unhealthy", ip, port, hostname, custom_hostname, limit, CTR_TCP)
 
 end
 
@@ -653,13 +681,14 @@ end
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 -- @param hostname (optional) hostname of the target being checked.
+-- @param custom_hostname (optional) target's HTTP hostname
 -- @param check (optional) the type of check, either "passive" or "active", default "passive".
 -- @return `true` on success, or `nil + error` on failure.
-function checker:report_timeout(ip, port, hostname, check)
+function checker:report_timeout(ip, port, hostname, custom_hostname, check)
 
   local limit = self.checks[check or "passive"].unhealthy.timeouts
 
-  return incr_counter(self, "unhealthy", ip, port, hostname, limit, CTR_TIMEOUT)
+  return incr_counter(self, "unhealthy", ip, port, hostname, custom_hostname, limit, CTR_TIMEOUT)
 
 end
 
@@ -669,26 +698,27 @@ end
 -- @param ip IP address of the target being checked
 -- @param port the port being checked against
 -- @param hostname (optional) hostname of the target being checked.
+-- @param custom_hostname (optional) target's HTTP hostname
 -- @param is_healthy boolean: `true` for healthy, `false` for unhealthy
 -- @return `true` on success, or `nil + error` on failure
-function checker:set_target_status(ip, port, hostname, is_healthy)
+function checker:set_target_status(ip, port, hostname, custom_hostname, is_healthy)
   ip   = tostring(assert(ip, "no ip address provided"))
   port = assert(tonumber(port), "no port number provided")
   assert(type(is_healthy) == "boolean")
 
   local health_report = is_healthy and "healthy" or "unhealthy"
 
-  local target = get_target(self, ip, port, hostname)
+  local target = get_target(self, ip, port, hostname, custom_hostname)
   if not target then
     -- sync issue: warn, but return success
     self:log(WARN, "trying to set status for a target that is not in the list: ", ip, ":", port)
     return true
   end
 
-  local counter_key = key_for(self.TARGET_COUNTER, ip, port, hostname)
-  local state_key = key_for(self.TARGET_STATE, ip, port, hostname)
+  local counter_key = key_for(self.TARGET_COUNTER, ip, port, hostname, custom_hostname)
+  local state_key = key_for(self.TARGET_STATE, ip, port, hostname, custom_hostname)
 
-  local ok, err = locking_target(self, ip, port, hostname, function()
+  local ok, err = locking_target(self, ip, port, hostname, custom_hostname, function()
 
     local _, err = self.shm:set(counter_key, 0)
     if err then
@@ -700,7 +730,7 @@ function checker:set_target_status(ip, port, hostname, is_healthy)
       return nil, err
     end
 
-    self:raise_event(self.events[health_report], ip, port, hostname)
+    self:raise_event(self.events[health_report], ip, port, hostname, custom_hostname)
 
     return true
 
@@ -714,10 +744,10 @@ end
 
 
 -- Introspection function for testing
-local function test_get_counter(self, ip, port, hostname)
-  return locking_target(self, ip, port, hostname, function()
-    local counter = self.shm:get(key_for(self.TARGET_COUNTER, ip, port, hostname))
-    local internal_health = (get_target(self, ip, port, hostname) or EMPTY).internal_health
+local function test_get_counter(self, ip, port, hostname, custom_hostname)
+  return locking_target(self, ip, port, hostname, custom_hostname, function()
+    local counter = self.shm:get(key_for(self.TARGET_COUNTER, ip, port, hostname, custom_hostname))
+    local internal_health = (get_target(self, ip, port, hostname, custom_hostname) or EMPTY).internal_health
     return counter, internal_health
   end)
 end
@@ -729,7 +759,7 @@ end
 
 
 -- Runs a single healthcheck probe
-function checker:run_single_check(ip, port, hostname)
+function checker:run_single_check(ip, port, hostname, custom_hostname)
 
   local sock, err = ngx.socket.tcp()
   if not sock then
@@ -744,50 +774,53 @@ function checker:run_single_check(ip, port, hostname)
   if not ok then
     if err == "timeout" then
       sock:close()  -- timeout errors do not close the socket.
-      return self:report_timeout(ip, port, hostname, "active")
+      return self:report_timeout(ip, port, hostname, custom_hostname, "active")
     end
-    return self:report_tcp_failure(ip, port, hostname, "connect", "active")
+    return self:report_tcp_failure(ip, port, hostname, custom_hostname, "connect", "active")
   end
 
   if self.checks.active.type == "tcp" then
     sock:close()
-    return self:report_success(ip, port, hostname, "active")
+    return self:report_success(ip, port, hostname, custom_hostname, "active")
   end
 
   if self.checks.active.type == "https" then
     local session
-    session, err = sock:sslhandshake(nil, hostname,
+    session, err = sock:sslhandshake(nil, custom_hostname or hostname,
                                      self.checks.active.https_verify_certificate)
     if not session then
       sock:close()
-      self:log(ERR, "failed SSL handshake with '", hostname, " (", ip, ":", port, ")': ", err)
-      return self:report_tcp_failure(ip, port, hostname, "connect", "active")
+      self:log(ERR, "failed SSL handshake with '", custom_hostname or hostname,
+               " (", ip, ":", port, ")': ", err)
+      return self:report_tcp_failure(ip, port, hostname, custom_hostname, "connect", "active")
     end
   end
 
   local path = self.checks.active.http_path
-  local request = ("GET %s HTTP/1.0\r\nHost: %s\r\n\r\n"):format(path, hostname)
+  local request = ("GET %s HTTP/1.0\r\nHost: %s\r\n\r\n"):format(path, custom_hostname or hostname)
 
   local bytes
   bytes, err = sock:send(request)
   if not bytes then
-    self:log(ERR, "failed to send http request to '", hostname, " (", ip, ":", port, ")': ", err)
+    self:log(ERR, "failed to send http request to '", custom_hostname or hostname,
+             " (", ip, ":", port, ")': ", err)
     if err == "timeout" then
       sock:close()  -- timeout errors do not close the socket.
-      return self:report_timeout(ip, port, hostname, "active")
+      return self:report_timeout(ip, port, hostname, custom_hostname, "active")
     end
-    return self:report_tcp_failure(ip, port, hostname, "send", "active")
+    return self:report_tcp_failure(ip, port, hostname, custom_hostname, "send", "active")
   end
 
   local status_line
   status_line, err = sock:receive()
   if not status_line then
-    self:log(ERR, "failed to receive status line from '", hostname, " (",ip, ":", port, ")': ", err)
+    self:log(ERR, "failed to receive status line from '", custom_hostname or hostname,
+             " (",ip, ":", port, ")': ", err)
     if err == "timeout" then
       sock:close()  -- timeout errors do not close the socket.
-      return self:report_timeout(ip, port, hostname, "active")
+      return self:report_timeout(ip, port, hostname, custom_hostname, "active")
     end
-    return self:report_tcp_failure(ip, port, hostname, "receive", "active")
+    return self:report_tcp_failure(ip, port, hostname, custom_hostname, "receive", "active")
   end
 
   local from, to = re_find(status_line,
@@ -797,23 +830,26 @@ function checker:run_single_check(ip, port, hostname)
   if from then
     status = tonumber(status_line:sub(from, to))
   else
-    self:log(ERR, "bad status line from '", hostname, " (", ip, ":", port, ")': ", status_line)
+    self:log(ERR, "bad status line from '", custom_hostname or hostname,
+             " (", ip, ":", port, ")': ", status_line)
     -- note: 'status' will be reported as 'nil'
   end
 
   sock:close()
 
-  self:log(DEBUG, "Reporting '", hostname, " (", ip, ":", port, ")' (got HTTP ", status, ")")
+  self:log(DEBUG, "Reporting '", custom_hostname or hostname,
+           " (", ip, ":", port, ")' (got HTTP ", status, ")")
 
-  return self:report_http_status(ip, port, hostname, status, "active")
+  return self:report_http_status(ip, port, hostname, custom_hostname, status, "active")
 end
 
 -- executes a work package (a list of checks) sequentially
 function checker:run_work_package(work_package)
   for _, work_item in ipairs(work_package) do
-    self:log(DEBUG, "Checking ", work_item.hostname, " ", work_item.ip, ":",
-                    work_item.port, " (currently ", work_item.debug_health, ")")
-    self:run_single_check(work_item.ip, work_item.port, work_item.hostname)
+    self:log(DEBUG, "Checking ", work_item.hostname, 
+    work_item.custom_hostname and " (as " .. work_item.custom_hostname .. ") " or " ", 
+    work_item.ip, ":", work_item.port, " (currently ", work_item.debug_health, ")")
+    self:run_single_check(work_item.ip, work_item.port, work_item.hostname, work_item.custom_hostname)
   end
 end
 
@@ -913,6 +949,7 @@ local function checker_callback(premature, self, health_mode)
           ip = target.ip,
           port = target.port,
           hostname = target.hostname,
+          custom_hostname = target.custom_hostname,
           debug_health = internal_health,
         }
       end
@@ -938,14 +975,18 @@ local function checker_callback(premature, self, health_mode)
 end
 
 -- Event handler callback
-function checker:event_handler(event_name, ip, port, hostname)
+function checker:event_handler(event_name, ip, port, hostname, custom_hostname)
 
-  local target_found = get_target(self, ip, port, hostname)
+  local target_found = get_target(self, ip, port, hostname, custom_hostname)
 
   if event_name == self.events.remove then
     if target_found then
       -- remove hash part
-      self.targets[target_found.ip][target_found.port][target_found.hostname] = nil
+      self.targets[target_found.ip][target_found.port][target_found.hostname][target_found.custom_hostname] = nil
+      if not next(self.targets[target_found.ip][target_found.port][target_found.hostname]) then
+        -- no more custom hostnames on this hostname, so delete it
+        self.targets[target_found.ip][target_found.port][target_found.hostname] = nil
+      end
       if not next(self.targets[target_found.ip][target_found.port]) then
         -- no more hostnames on this port, so delete it
         self.targets[target_found.ip][target_found.port] = nil
@@ -962,12 +1003,15 @@ function checker:event_handler(event_name, ip, port, hostname)
           break
         end
       end
-      self:log(DEBUG, "event: target '", hostname or "", " (", ip, ":", port,
-                      "' removed")
+      self:log(DEBUG, "event: target '", hostname or "",
+                      custom_hostname and " (as " .. custom_hostname .. ") " or "",
+                      " (", ip, ":", port, "' removed")
 
     else
       self:log(WARN, "event: trying to remove an unknown target '",
-                      hostname or "", "(", ip, ":", port, ")'")
+                      hostname or "",
+                      custom_hostname and " (as " .. custom_hostname .. ") " or "",
+                      "(", ip, ":", port, ")'")
     end
 
   elseif event_name == self.events.healthy or
@@ -977,17 +1021,24 @@ function checker:event_handler(event_name, ip, port, hostname)
          then
     if not target_found then
       -- it is a new target, must add it first
-      target_found = { ip = ip, port = port, hostname = hostname }
+      target_found = { ip = ip, port = port, hostname = hostname, custom_hostname = custom_hostname }
       self.targets[target_found.ip] = self.targets[target_found.ip] or {}
       self.targets[target_found.ip][target_found.port] = self.targets[target_found.ip][target_found.port] or {}
-      self.targets[target_found.ip][target_found.port][target_found.hostname or ip] = target_found
+      self.targets[target_found.ip][target_found.port][target_found.hostname or ip] = 
+        self.targets[target_found.ip][target_found.port][target_found.hostname or ip] or {}
+      self.targets[target_found.ip][target_found.port][target_found.hostname or ip][target_found.custom_hostname or ip] =
+        target_found
       self.targets[#self.targets + 1] = target_found
-      self:log(DEBUG, "event: target added '", hostname or "", "(", ip, ":", port, ")'")
+      self:log(DEBUG, "event: target added '", hostname or "", 
+                      custom_hostname and " (as " .. custom_hostname .. ") " or "",
+                      "(", ip, ":", port, ")'")
     end
     do
       local from = target_found.internal_health
       local to = event_name
-      self:log(DEBUG, "event: target status '", hostname or "", "(", ip, ":", port,
+      self:log(DEBUG, "event: target status '", hostname or "",
+                      custom_hostname and " (as " .. custom_hostname .. ") " or "",
+                      "(", ip, ":", port,
                       ")' from '", from == "healthy" or from == "mostly_healthy",
                       "' to '",   to   == "healthy" or to   == "mostly_healthy", "'")
     end
@@ -1017,8 +1068,13 @@ end
 
 
 -- Raises an event for a target status change.
-function checker:raise_event(event_name, ip, port, hostname)
-  local target = { ip = ip, port = port, hostname = hostname }
+function checker:raise_event(event_name, ip, port, hostname, custom_hostname)
+  local target = { 
+    ip = ip,
+    port = port,
+    hostname = hostname,
+    custom_hostname = custom_hostname,
+  }
   worker_events.post(self.EVENT_SOURCE, event_name, target)
 end
 
@@ -1301,14 +1357,19 @@ function _M.new(opts)
 
       -- load individual statuses
       for _, target in ipairs(self.targets) do
-        local state_key = key_for(self.TARGET_STATE, target.ip, target.port, target.hostname)
+        local state_key = key_for(self.TARGET_STATE, target.ip, target.port,
+                                  target.hostname, target.custom_hostname)
         target.internal_health = INTERNAL_STATES[self.shm:get(state_key)]
         self:log(DEBUG, "Got initial status ", target.internal_health, " ",
-                        target.hostname, " ", target.ip, ":", target.port)
+                        target.hostname,
+                        target.custom_hostname and " (" .. target.custom_hostname .. ") " or " ",
+                        target.ip, ":", target.port)
         -- fill-in the hash part for easy lookup
         self.targets[target.ip] = self.targets[target.ip] or {}
         self.targets[target.ip][target.port] = self.targets[target.ip][target.port] or {}
-        self.targets[target.ip][target.port][target.hostname] = target
+        self.targets[target.ip][target.port][target.hostname] = 
+          self.targets[target.ip][target.port][target.hostname] or {}
+        self.targets[target.ip][target.port][target.hostname][target.custom_hostname] = target
       end
 
       return true
@@ -1319,7 +1380,7 @@ function _M.new(opts)
 
     self.ev_callback = function(data, event)
       -- just a wrapper to be able to access `self` as a closure
-      return self:event_handler(event, data.ip, data.port, data.hostname)
+      return self:event_handler(event, data.ip, data.port, data.hostname, data.custom_hostname)
     end
     worker_events.register_weak(self.ev_callback, self.EVENT_SOURCE)
 

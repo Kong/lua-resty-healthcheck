@@ -68,12 +68,12 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2122, nil, true)
-            local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
-            checker:report_timeout("127.0.0.1", 2122, nil, "active")
-            checker:report_timeout("127.0.0.1", 2113, nil, "passive")
-            checker:report_timeout("127.0.0.1", 2122, nil, "active")
-            checker:report_timeout("127.0.0.1", 2113, nil, "passive")
+            local ok, err = checker:add_target("127.0.0.1", 2122, nil, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2113, nil, nil, true)
+            checker:report_timeout("127.0.0.1", 2122, nil, nil, nil, "active")
+            checker:report_timeout("127.0.0.1", 2113, nil, nil, nil, "passive")
+            checker:report_timeout("127.0.0.1", 2122, nil, nil, nil, "active")
+            checker:report_timeout("127.0.0.1", 2113, nil, nil, nil, "passive")
             ngx.say(checker:get_target_status("127.0.0.1", 2122))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- false
         }
@@ -143,10 +143,10 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2122, nil, true)
-            checker:report_timeout("127.0.0.1", 2122, nil, "active")
-            checker:report_timeout("127.0.0.1", 2122, nil, "active")
-            checker:report_timeout("127.0.0.1", 2122, nil, "active")
+            local ok, err = checker:add_target("127.0.0.1", 2122, nil, nil, true)
+            checker:report_timeout("127.0.0.1", 2122, nil, nil, "active")
+            checker:report_timeout("127.0.0.1", 2122, nil, nil, "active")
+            checker:report_timeout("127.0.0.1", 2122, nil, nil, "active")
             ngx.say(checker:get_target_status("127.0.0.1", 2122))  -- true
         }
     }
@@ -212,10 +212,10 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2122, nil, true)
-            checker:report_timeout("127.0.0.1", 2122, nil, "passive")
-            checker:report_timeout("127.0.0.1", 2122, nil, "passive")
-            checker:report_timeout("127.0.0.1", 2122, nil, "passive")
+            local ok, err = checker:add_target("127.0.0.1", 2122, nil, nil, true)
+            checker:report_timeout("127.0.0.1", 2122, nil, nil, "passive")
+            checker:report_timeout("127.0.0.1", 2122, nil, nil, "passive")
+            checker:report_timeout("127.0.0.1", 2122, nil, nil, "passive")
             ngx.say(checker:get_target_status("127.0.0.1", 2122))  -- true
         }
     }

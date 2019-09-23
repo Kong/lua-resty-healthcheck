@@ -33,11 +33,11 @@ qq{
                 shm_name = "test_shm",
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2112, nil, nil, true)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
-            checker:set_target_status("127.0.0.1", 2112, nil, false)
+            checker:set_target_status("127.0.0.1", 2112, nil, nil, false)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- false
-            checker:set_target_status("127.0.0.1", 2112, nil, true)
+            checker:set_target_status("127.0.0.1", 2112, nil, nil, true)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
         }
     }
@@ -71,12 +71,12 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2112, nil, nil, true)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
-            checker:report_http_status("127.0.0.1", 2112, nil, 500)
-            checker:report_http_status("127.0.0.1", 2112, nil, 500)
+            checker:report_http_status("127.0.0.1", 2112, nil, nil, 500)
+            checker:report_http_status("127.0.0.1", 2112, nil, nil, 500)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- false
-            checker:set_target_status("127.0.0.1", 2112, nil, true)
+            checker:set_target_status("127.0.0.1", 2112, nil, nil, true)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
         }
     }
@@ -113,13 +113,13 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2112, nil, nil, true)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
-            checker:report_http_status("127.0.0.1", 2112, nil, 500)
-            checker:set_target_status("127.0.0.1", 2112, nil, true)
-            checker:report_http_status("127.0.0.1", 2112, nil, 500)
+            checker:report_http_status("127.0.0.1", 2112, nil, nil, 500)
+            checker:set_target_status("127.0.0.1", 2112, nil, nil, true)
+            checker:report_http_status("127.0.0.1", 2112, nil, nil, 500)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
-            checker:report_http_status("127.0.0.1", 2112, nil, 500)
+            checker:report_http_status("127.0.0.1", 2112, nil, nil, 500)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- false
         }
     }
@@ -129,7 +129,7 @@ GET /t
 true
 true
 false
-=== TEST 3: set_target_status() resets the success counters
+=== TEST 4: set_target_status() resets the success counters
 --- http_config eval
 qq{
     $::HttpConfig
@@ -156,14 +156,14 @@ qq{
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
-            checker:set_target_status("127.0.0.1", 2112, nil, false)
+            local ok, err = checker:add_target("127.0.0.1", 2112, nil, nil, true)
+            checker:set_target_status("127.0.0.1", 2112, nil, nil, false)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- false
-            checker:report_http_status("127.0.0.1", 2112, nil, 200)
-            checker:set_target_status("127.0.0.1", 2112, nil, false)
-            checker:report_http_status("127.0.0.1", 2112, nil, 200)
+            checker:report_http_status("127.0.0.1", 2112, nil, nil, 200)
+            checker:set_target_status("127.0.0.1", 2112, nil, nil, false)
+            checker:report_http_status("127.0.0.1", 2112, nil, nil, 200)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- false
-            checker:report_http_status("127.0.0.1", 2112, nil, 200)
+            checker:report_http_status("127.0.0.1", 2112, nil, nil, 200)
             ngx.say(checker:get_target_status("127.0.0.1", 2112))  -- true
         }
     }

@@ -61,7 +61,7 @@ qq{
                     },
                 }
             })
-            assert(checker:add_target("127.0.0.1", 2121, nil, true))
+            assert(checker:add_target("127.0.0.1", 2121, nil, nil, true))
             local weak_table = setmetatable({ checker },{
               __mode = "v",
             })

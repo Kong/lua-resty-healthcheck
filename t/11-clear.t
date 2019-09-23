@@ -41,7 +41,7 @@ __DATA__
             }
             local checker1 = healthcheck.new(config)
             for i = 1, 10 do
-                checker1:add_target("127.0.0.1", 10000 + i, nil, false)
+                checker1:add_target("127.0.0.1", 10000 + i, nil, nil, false)
             end
             ngx.sleep(0.2) -- wait twice the interval
             checker1:clear()
@@ -97,7 +97,7 @@ initial target list (11 targets)
             local checker1 = healthcheck.new(config)
             local checker2 = healthcheck.new(config)
             for i = 1, 10 do
-                checker1:add_target("127.0.0.1", 20000 + i, nil, false)
+                checker1:add_target("127.0.0.1", 20000 + i, nil, nil, false)
             end
             checker2:clear()
             ngx.sleep(0.2) -- wait twice the interval
@@ -150,10 +150,10 @@ qq{
                 }
             }
             local checker1 = healthcheck.new(config)
-            checker1:add_target("127.0.0.1", 21120, nil, true)
+            checker1:add_target("127.0.0.1", 21120, nil, nil, true)
             ngx.sleep(0.3) -- wait 1.5x the interval
             checker1:clear()
-            checker1:add_target("127.0.0.1", 21120, nil, true)
+            checker1:add_target("127.0.0.1", 21120, nil, nil, true)
             ngx.sleep(0.3) -- wait 1.5x the interval
             ngx.say(true)
         }

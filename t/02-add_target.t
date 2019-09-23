@@ -40,7 +40,7 @@ __DATA__
                 }
             })
             ngx.sleep(0.2) -- wait twice the interval
-            local ok, err = checker:add_target("127.0.0.1", 11111, nil, false)
+            local ok, err = checker:add_target("127.0.0.1", 11111, nil, nil, false)
             ngx.say(ok)
             ngx.sleep(0.2) -- wait twice the interval
         }
@@ -93,7 +93,7 @@ qq{
                 }
             })
             ngx.sleep(0.2) -- wait twice the interval
-            local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2112, nil, nil, true)
             ngx.say(ok)
             ngx.sleep(0.2) -- wait twice the interval
         }
@@ -149,8 +149,8 @@ qq{
                 }
             })
             ngx.sleep(0.2) -- wait twice the interval
-            local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
-            local ok, err = checker:add_target("127.0.0.1", 2113, nil, false)
+            local ok, err = checker:add_target("127.0.0.1", 2113, nil, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2113, nil, nil, false)
             ngx.say(ok)
             ngx.sleep(0.2) -- wait twice the interval
         }
