@@ -42,7 +42,7 @@ http {
             }
         })
 
-        local ok, err = checker:add_target("127.0.0.1", 8080, "example.com", false)
+        local ok, err = checker:add_target("127.0.0.1", 8080, "example.com", "example", false)
 
         local handler = function(target, eventname, sourcename, pid)
             ngx.log(ngx.DEBUG,"Event from: ", sourcename)
@@ -88,11 +88,16 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
-### 1.0.x (unreleased)
+### 2.0.0 (23-Sep-2019)
+
+ * BREAKING: all API functions related to hosts require a `custom_hostname`
+   argument now. This change makes it possible to track different server names
+   that resolve to the same IP, port, and hostname combination.
  * Fix: log error on SSL Handshake failure
    [#28](https://github.com/Kong/lua-resty-healthcheck/pull/28);
    
 ### 1.0.0 (05-Jul-2019)
+
  * BREAKING: all API functions related to hosts require a `hostname` argument
    now. This way different hostnames listening on the same IP and ports
    combination do not have an effect on each other.
@@ -147,7 +152,7 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 ## Copyright and License
 
 ```
-Copyright 2017-2018 Kong Inc.
+Copyright 2017-2019 Kong Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
