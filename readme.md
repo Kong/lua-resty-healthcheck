@@ -88,7 +88,8 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
-### 1.0.x (unreleased)
+### 1.1.0 (30-Sep-2019)
+ * Add support for setting the custom `Host` header to be used for active checks.
  * Fix: log error on SSL Handshake failure
    [#28](https://github.com/Kong/lua-resty-healthcheck/pull/28);
    
