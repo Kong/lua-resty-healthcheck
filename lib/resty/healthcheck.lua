@@ -234,8 +234,10 @@ end
 -- probe request
 -- @param is_healthy (optional) a boolean value indicating the initial state,
 -- default is `true`.
+-- @param hostheader (optional) a value to use for the Host header on
+-- active healthchecks.
 -- @return `true` on success, or `nil + error` on failure.
-function checker:add_target(ip, port, hostname, is_healthy)
+function checker:add_target(ip, port, hostname, is_healthy, hostheader)
   ip = tostring(assert(ip, "no ip address provided"))
   port = assert(tonumber(port), "no port number provided")
   if is_healthy == nil then
@@ -269,6 +271,7 @@ function checker:add_target(ip, port, hostname, is_healthy)
       ip = ip,
       port = port,
       hostname = hostname,
+      hostheader = hostheader,
     }
     target_list = serialize(target_list)
 
@@ -482,7 +485,8 @@ local function incr_counter(self, health_report, ip, port, hostname, limit, ctr_
   local target = get_target(self, ip, port, hostname)
   if not target then
     -- sync issue: warn, but return success
-    self:log(WARN, "trying to increment a target that is not in the list: ", ip, ":", port)
+    self:log(WARN, "trying to increment a target that is not in the list: ",
+    hostname and "(" .. hostname .. ") " or "", ip, ":", port)
     return true
   end
 
@@ -729,7 +733,7 @@ end
 
 
 -- Runs a single healthcheck probe
-function checker:run_single_check(ip, port, hostname)
+function checker:run_single_check(ip, port, hostname, hostheader)
 
   local sock, err = ngx.socket.tcp()
   if not sock then
@@ -766,7 +770,7 @@ function checker:run_single_check(ip, port, hostname)
   end
 
   local path = self.checks.active.http_path
-  local request = ("GET %s HTTP/1.0\r\nHost: %s\r\n\r\n"):format(path, hostname)
+  local request = ("GET %s HTTP/1.0\r\nHost: %s\r\n\r\n"):format(path, hostheader or hostname)
 
   local bytes
   bytes, err = sock:send(request)
@@ -811,9 +815,12 @@ end
 -- executes a work package (a list of checks) sequentially
 function checker:run_work_package(work_package)
   for _, work_item in ipairs(work_package) do
-    self:log(DEBUG, "Checking ", work_item.hostname, " ", work_item.ip, ":",
-                    work_item.port, " (currently ", work_item.debug_health, ")")
-    self:run_single_check(work_item.ip, work_item.port, work_item.hostname)
+    self:log(DEBUG, "Checking ", work_item.hostname, " ",
+                    work_item.hostheader and "(host header: ".. work_item.hostheader .. ")"
+                    or "", work_item.ip, ":", work_item.port,
+                    " (currently ", work_item.debug_health, ")")
+    local hostheader = work_item.hostheader or work_item.hostname
+    self:run_single_check(work_item.ip, work_item.port, work_item.hostname, hostheader)
   end
 end
 
@@ -902,8 +909,10 @@ local function checker_callback(premature, self, health_mode)
     -- create a list of targets to check, here we can still do this atomically
     local start_time = ngx_now()
     local list_to_check = {}
-    for _, target in ipairs(self.targets) do
-      local internal_health = target.internal_health
+    local targets = fetch_target_list(self)
+    for _, target in ipairs(targets) do
+      local tgt = get_target(self, target.ip, target.port, target.hostname)
+      local internal_health = tgt and tgt.internal_health or nil
       if (health_mode == "healthy" and (internal_health == "healthy" or
                                         internal_health == "mostly_healthy"))
       or (health_mode == "unhealthy" and (internal_health == "unhealthy" or
@@ -913,6 +922,7 @@ local function checker_callback(premature, self, health_mode)
           ip = target.ip,
           port = target.port,
           hostname = target.hostname,
+          hostheader = target.hostheader,
           debug_health = internal_health,
         }
       end
