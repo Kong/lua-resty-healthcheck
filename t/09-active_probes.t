@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * 52;
+plan tests => repeat_each() * 56;
 
 my $pwd = cwd();
 
