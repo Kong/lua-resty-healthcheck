@@ -1324,7 +1324,9 @@ function _M.new(opts)
       return true
     end)
     if not ok then
-      self:log(ERR, "Error loading initial target list: ", err)
+      -- locking failed, we don't protect `targets` of being nil in other places
+      -- so consider this as not recoverable
+      return nil, "Error loading initial target list: " .. err
     end
 
     self.ev_callback = function(data, event)
