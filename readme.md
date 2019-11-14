@@ -88,6 +88,11 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.1.1 (14-Nov-2019)
+ * Fix: fail when it is not possible to get exclusive access to the list of
+   targets. This fix prevents that workers get to an inconsistent state.
+   [#34](https://github.com/Kong/lua-resty-healthcheck/pull/34)
+
 ### 1.1.0 (30-Sep-2019)
  * Add support for setting the custom `Host` header to be used for active checks.
  * Fix: log error on SSL Handshake failure
@@ -148,7 +153,7 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 ## Copyright and License
 
 ```
-Copyright 2017-2018 Kong Inc.
+Copyright 2017-2019 Kong Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
