@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * 50;
+plan tests => repeat_each() * 53;
 
 my $pwd = cwd();
 
@@ -444,3 +444,50 @@ checking unhealthy targets: nothing to do
 --- no_error_log
 unhealthy HTTP increment
 event: target status '(127.0.0.1:2119)' from 'true' to 'false'
+
+
+=== TEST 5: report_http_status() must work in log phase
+--- http_config eval
+qq{
+    $::HttpConfig
+}
+--- config
+    location = /t {
+        content_by_lua_block {
+            ngx.say("OK")
+        }
+        log_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+            local checker = healthcheck.new({
+                name = "testing",
+                shm_name = "test_shm",
+                type = "http",
+                checks = {
+                    passive = {
+                        healthy  = {
+                            successes = 3,
+                        },
+                        unhealthy  = {
+                            tcp_failures = 2,
+                            http_failures = 3,
+                        }
+                    }
+                }
+            })
+            local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
+            checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
+            checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
+            checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
+            checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
+            checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
+            checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
+        }
+    }
+--- request
+GET /t
+--- response_body
+OK
+--- no_error_log
+failed to acquire lock: API disabled in the context of log_by_lua
