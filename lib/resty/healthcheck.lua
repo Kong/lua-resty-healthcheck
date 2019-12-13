@@ -175,47 +175,69 @@ local function fetch_target_list(self)
 end
 
 
+--- Helper function to run the function holding a lock on the target list.
+-- @see locking_target_list
+local function run_fn_locked_target_list(premature, self, fn)
+
+  if premature then
+    return
+  end
+
+  local lock, lock_err = resty_lock:new(self.shm_name, {
+    exptime = 10,  -- timeout after which lock is released anyway
+    timeout = 5,   -- max wait time to acquire lock
+  })
+
+  if not lock then
+    return nil, "failed to create lock:" .. lock_err
+  end
+
+  local pok, perr = pcall(resty_lock.lock, lock, self.TARGET_LIST_LOCK)
+  if not pok then
+    self:log(DEBUG, "failed to acquire lock: ", perr)
+    return nil, "failed to acquire lock"
+  end
+
+  local target_list, err = fetch_target_list(self)
+
+  local final_ok, final_err
+
+  if target_list then
+    final_ok, final_err = pcall(fn, target_list)
+  else
+    final_ok, final_err = nil, err
+  end
+
+  local ok
+  ok, err = lock:unlock()
+  if not ok then
+    -- recoverable: not returning this error, only logging it
+    self:log(ERR, "failed to release lock '", self.TARGET_LIST_LOCK,
+        "': ", err)
+  end
+
+  return final_ok, final_err
+end
+
+
 --- Run the given function holding a lock on the target list.
--- WARNING: the callback will run unprotected, so it should never
--- throw an error, but always return `nil + error` instead.
 -- @param self The checker object
 -- @param fn The function to execute
 -- @return The results of the function; or nil and an error message
 -- in case it fails locking.
 local function locking_target_list(self, fn)
 
-  local lock, lock_err = resty_lock:new(self.shm_name, {
-                  exptime = 10,  -- timeout after which lock is released anyway
-                  timeout = 5,   -- max wait time to acquire lock
-                })
-  if not lock then
-    return nil, "failed to create lock:" .. lock_err
+  local ok, err = run_fn_locked_target_list(false, self, fn)
+  if err == "failed to acquire lock" then
+    local _, terr = ngx.timer.at(0, run_fn_locked_target_list, self, fn)
+    if terr ~= nil then
+      return nil, terr
+    end
+
+    return true
   end
 
-  local ok, err = lock:lock(self.TARGET_LIST_LOCK)
-  if not ok then
-    return nil, "failed to acquire lock: " .. err
-  end
-
-  local target_list
-  target_list, err = fetch_target_list(self)
-
-  local final_ok, final_err
-
-  if target_list then
-    final_ok, final_err = fn(target_list)
-  else
-    final_ok, final_err = nil, err
-  end
-
-  ok, err = lock:unlock()
-  if not ok then
-    -- recoverable: not returning this error, only logging it
-    self:log(ERR, "failed to release lock '", self.TARGET_LIST_LOCK,
-                  "': ", err)
-  end
-
-  return final_ok, final_err
+  return ok, err
 end
 
 
@@ -416,17 +438,13 @@ end
 ------------------------------------------------------------------------------
 
 
--- Run the given function holding a lock on the target.
--- WARNING: the callback will run unprotected, so it should never
--- throw an error, but always return `nil + error` instead.
--- @param self The checker object
--- @param ip Target IP
--- @param port Target port
--- @param hostname Target hostname
--- @param fn The function to execute
--- @return The results of the function; or nil and an error message
--- in case it fails locking.
-local function locking_target(self, ip, port, hostname, fn)
+--- Helper function to actually run the function holding a lock on the target.
+-- @see locking_target
+local function run_mutexed_fn(premature, self, ip, port, hostname, fn)
+  if premature then
+    return
+  end
+
   local lock, lock_err = resty_lock:new(self.shm_name, {
                   exptime = 10,  -- timeout after which lock is released anyway
                   timeout = 5,   -- max wait time to acquire lock
@@ -436,20 +454,45 @@ local function locking_target(self, ip, port, hostname, fn)
   end
   local lock_key = key_for(self.TARGET_LOCK, ip, port, hostname)
 
-  local ok, err = lock:lock(lock_key)
-  if not ok then
-    return nil, "failed to acquire lock: " .. err
+  local pok, perr = pcall(resty_lock.lock, lock, lock_key)
+  if not pok then
+    self:log(DEBUG, "failed to acquire lock: ", perr)
+    return nil, "failed to acquire lock"
   end
 
-  local final_ok, final_err = fn()
+  local final_ok, final_err = pcall(fn)
 
-  ok, err = lock:unlock()
+  local ok, err = lock:unlock()
   if not ok then
     -- recoverable: not returning this error, only logging it
     self:log(ERR, "failed to release lock '", lock_key, "': ", err)
   end
 
   return final_ok, final_err
+
+end
+
+
+-- Run the given function holding a lock on the target.
+-- @param self The checker object
+-- @param ip Target IP
+-- @param port Target port
+-- @param hostname Target hostname
+-- @param fn The function to execute
+-- @return The results of the function; or true in case it fails locking and
+-- will retry asynchronously; or nil+err in case it fails to retry.
+local function locking_target(self, ip, port, hostname, fn)
+  local ok, err = run_mutexed_fn(false, self, ip, port, hostname, fn)
+  if err == "failed to acquire lock" then
+    local _, terr = ngx.timer.at(0, run_mutexed_fn, self, ip, port, hostname, fn)
+    if terr ~= nil then
+      return nil, terr
+    end
+
+    return true
+  end
+
+  return ok, err
 end
 
 
