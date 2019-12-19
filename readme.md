@@ -88,17 +88,28 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.1.2 (19-Dec-2019)
+
+ * Fix: when `ngx.sleep` API is not available (e.g. in the log phase) it is not
+   possible to lock using lua-resty-lock and any function that needs exclusive
+   access would fail. This fix adds a retry method that starts a new light
+   thread, which has access to `ngx.sleep`, to lock the critical path.
+   [#37](https://github.com/Kong/lua-resty-healthcheck/pull/37);
+
 ### 1.1.1 (14-Nov-2019)
+
  * Fix: fail when it is not possible to get exclusive access to the list of
    targets. This fix prevents that workers get to an inconsistent state.
-   [#34](https://github.com/Kong/lua-resty-healthcheck/pull/34)
+   [#34](https://github.com/Kong/lua-resty-healthcheck/pull/34);
 
 ### 1.1.0 (30-Sep-2019)
+
  * Add support for setting the custom `Host` header to be used for active checks.
  * Fix: log error on SSL Handshake failure
    [#28](https://github.com/Kong/lua-resty-healthcheck/pull/28);
    
 ### 1.0.0 (05-Jul-2019)
+
  * BREAKING: all API functions related to hosts require a `hostname` argument
    now. This way different hostnames listening on the same IP and ports
    combination do not have an effect on each other.
