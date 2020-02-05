@@ -711,6 +711,32 @@ function checker:report_timeout(ip, port, hostname, check)
 end
 
 
+--- Sets the current status of all targets with the given hostname and port.
+-- @param hostname hostname being checked.
+-- @param port the port being checked against
+-- @param is_healthy boolean: `true` for healthy, `false` for unhealthy
+-- @return `true` on success, or `nil + error` on failure.
+function checker:set_all_target_statuses_for_hostname(hostname, port, is_healthy)
+  assert(type(hostname) == "string", "no hostname provided")
+  port = assert(tonumber(port), "no port number provided")
+  assert(type(is_healthy) == "boolean")
+
+  local all_ok = true
+  local errs = {}
+  for _, target in ipairs(self.targets) do
+    if target.port == port and target.hostname == hostname then
+      local ok, err = self:set_target_status(target.ip, port, hostname, is_healthy)
+      if not ok then
+        all_ok = nil
+        table.insert(errs, err)
+      end
+    end
+  end
+
+  return all_ok, #errs > 0 and table.concat(errs, "; ") or nil
+end
+
+
 --- Sets the current status of the target.
 -- This will immediately set the status and clear its counters.
 -- @param ip IP address of the target being checked
