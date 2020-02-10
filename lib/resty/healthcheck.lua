@@ -727,7 +727,7 @@ function checker:set_all_target_statuses_for_hostname(hostname, port, is_healthy
     if target.port == port and target.hostname == hostname then
       local ok, err = self:set_target_status(target.ip, port, hostname, is_healthy)
       if not ok then
-        all_ok = false
+        all_ok = nil
         table.insert(errs, err)
       end
     end
