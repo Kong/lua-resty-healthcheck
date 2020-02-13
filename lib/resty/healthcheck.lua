@@ -131,7 +131,7 @@ local id = function(x) return x end
 local worker_color = use_color and function(str) return ("\027["..tostring(31 + ngx.worker.pid() % 5).."m"..str.."\027[0m") end or id
 
 -- Debug function
-local function dump(...) print(require("pl.pretty").write({...})) end
+local function dump(...) print(require("pl.pretty").write({...})) end -- luacheck: ignore 211
 
 local _M = {}
 
