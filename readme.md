@@ -88,6 +88,11 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.2.0 (13-Feb-2020)
+
+ * Adds `set_all_target_statuses_for_hostname`, which sets the targets for
+   all entries with a given hostname at once.
+
 ### 1.1.2 (19-Dec-2019)
 
  * Fix: when `ngx.sleep` API is not available (e.g. in the log phase) it is not
@@ -107,7 +112,7 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
  * Add support for setting the custom `Host` header to be used for active checks.
  * Fix: log error on SSL Handshake failure
    [#28](https://github.com/Kong/lua-resty-healthcheck/pull/28);
-   
+
 ### 1.0.0 (05-Jul-2019)
 
  * BREAKING: all API functions related to hosts require a `hostname` argument
