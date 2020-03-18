@@ -38,6 +38,7 @@ local resty_lock = require ("resty.lock")
 local re_find = ngx.re.find
 local bit = require("bit")
 local ngx_now = ngx.now
+local h2 = require ("resty.healthcheck.h2")
 
 -- constants
 local EVENT_SOURCE_PREFIX = "lua-resty-healthcheck"
@@ -813,6 +814,14 @@ function checker:run_single_check(ip, port, hostname, hostheader)
   end
 
   local path = self.checks.active.http_path
+
+  if self.checks.active.type == "h2c" then
+    local conn = h2:new(path, ip, port)
+    local status = conn:request()
+    conn:close()
+    return self:report_http_status(ip, port, hostname, status, "active")
+  end
+
   local request = ("GET %s HTTP/1.0\r\nHost: %s\r\n\r\n"):format(path, hostheader or hostname)
 
   local bytes
@@ -1230,6 +1239,7 @@ do
     http = true,
     tcp = true,
     https = true,
+    h2c = true,
   }
   check_valid_type = function(var, val)
     assert(valid_types[val],
@@ -1247,7 +1257,7 @@ end
 --
 -- * `name`: name of the health checker
 -- * `shm_name`: the name of the `lua_shared_dict` specified in the Nginx configuration to use
--- * `checks.active.type`: "http", "https" or "tcp" (default is "http")
+-- * `checks.active.type`: "http", "https", "h2c" or "tcp" (default is "http")
 -- * `checks.active.timeout`: socket timeout for active checks (in seconds)
 -- * `checks.active.concurrency`: number of targets to check concurrently
 -- * `checks.active.http_path`: path to use in `GET` HTTP request to run on active checks
@@ -1260,7 +1270,7 @@ end
 -- * `checks.active.unhealthy.tcp_failures`: number of TCP failures to consider a target unhealthy
 -- * `checks.active.unhealthy.timeouts`: number of timeouts to consider a target unhealthy
 -- * `checks.active.unhealthy.http_failures`: number of HTTP failures to consider a target unhealthy
--- * `checks.passive.type`: "http", "https" or "tcp" (default is "http"; for passive checks, "http" and "https" are equivalent)
+-- * `checks.passive.type`: "http", "https", "h2c" or "tcp" (default is "http"; for passive checks, "http" and "https" are equivalent)
 -- * `checks.passive.healthy.http_statuses`: which HTTP statuses to consider a failure
 -- * `checks.passive.healthy.successes`: number of successes to consider a target healthy
 -- * `checks.passive.unhealthy.http_statuses`: which HTTP statuses to consider a success

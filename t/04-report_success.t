@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * 32;
+plan tests => repeat_each() * 44;
 
 my $pwd = cwd();
 
@@ -296,4 +296,67 @@ GET /t
 false
 --- no_error_log
 healthy SUCCESS increment
+event: target status '(127.0.0.1:2118)' from 'false' to 'true'
+
+
+
+=== TEST 5: report_success() recovers HTTP active + passive
+--- http_config eval
+qq{
+    $::HttpConfig
+
+    server {
+        listen 2116 http2;
+        location = /status {
+            return 200;
+        }
+    }
+}
+--- config
+    location = /t {
+        content_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+            local checker = healthcheck.new({
+                name = "testing",
+                shm_name = "test_shm",
+                checks = {
+                    active = {
+                        http_path = "/status",
+                        type = "h2c",
+                        healthy  = {
+                            interval = 999, -- we don't want active checks
+                            successes = 3,
+                        },
+                        unhealthy  = {
+                            interval = 999, -- we don't want active checks
+                            tcp_failures = 3,
+                            http_failures = 3,
+                        }
+                    },
+                }
+            })
+            ngx.sleep(0.1) -- wait for initial timers to run once
+            local ok, err = checker:add_target("127.0.0.1", 2116, nil, false)
+            checker:report_success("127.0.0.1", 2116, nil, "active")
+            checker:report_success("127.0.0.1", 2116, nil, "active")
+            checker:report_success("127.0.0.1", 2116, nil, "active")
+            ngx.say(checker:get_target_status("127.0.0.1", 2116))  -- true
+        }
+    }
+--- request
+GET /t
+--- response_body
+true
+--- error_log
+checking healthy targets: nothing to do
+checking unhealthy targets: nothing to do
+healthy SUCCESS increment (1/3) for '(127.0.0.1:2116)'
+healthy SUCCESS increment (2/3) for '(127.0.0.1:2116)'
+healthy SUCCESS increment (3/3) for '(127.0.0.1:2116)'
+event: target status '(127.0.0.1:2116)' from 'false' to 'true'
+healthy SUCCESS increment (1/3) for '(127.0.0.1:2116)'
+healthy SUCCESS increment (2/3) for '(127.0.0.1:2116)'
+healthy SUCCESS increment (3/3) for '(127.0.0.1:2116)'
 event: target status '(127.0.0.1:2118)' from 'false' to 'true'
