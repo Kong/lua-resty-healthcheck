@@ -38,6 +38,7 @@ local resty_lock = require ("resty.lock")
 local re_find = ngx.re.find
 local bit = require("bit")
 local ngx_now = ngx.now
+local ssl = require("ngx.ssl")
 
 -- constants
 local EVENT_SOURCE_PREFIX = "lua-resty-healthcheck"
@@ -829,8 +830,16 @@ function checker:run_single_check(ip, port, hostname, hostheader)
 
   if self.checks.active.type == "https" then
     local session
-    session, err = sock:sslhandshake(nil, hostname,
+    if self.ssl_cert and self.ssl_key then
+      session, err = sock:tlshandshake({
+        verify = self.checks.active.https_verify_certificate,
+        client_cert = self.ssl_cert,
+        client_priv_key = self.ssl_key
+      })
+    else
+      session, err = sock:sslhandshake(nil, hostname,
                                      self.checks.active.https_verify_certificate)
+    end
     if not session then
       sock:close()
       self:log(ERR, "failed SSL handshake with '", hostname, " (", ip, ":", port, ")': ", err)
@@ -1338,6 +1347,12 @@ function _M.new(opts)
 
   self.shm = ngx.shared[tostring(opts.shm_name)]
   assert(self.shm, ("no shm found by name '%s'"):format(opts.shm_name))
+
+  -- load certificate and key
+  if opts.ssl_cert and opts.ssl_key then
+    self.ssl_cert = assert(ssl.parse_pem_cert(opts.ssl_cert))
+    self.ssl_key = assert(ssl.parse_pem_priv_key(opts.ssl_key))
+  end
 
   -- other properties
   self.targets = nil     -- list of targets, initially loaded, maintained by events
