@@ -156,6 +156,8 @@ end
 
 local checker = {}
 
+--use the wait_add_target_list to store the target before added to the target_list actually.
+checker.wait_add_target_list = {}
 
 ------------------------------------------------------------------------------
 -- Node management.
@@ -243,8 +245,15 @@ end
 
 --- Get a target
 local function get_target(self, ip, port, hostname)
+  
   hostname = hostname or ip
-  return ((self.targets[ip] or EMPTY)[port] or EMPTY)[hostname]
+
+  if not self.targets then
+    return ((self.wait_add_target_list[ip] or EMPTY)[port] or EMPTY)[hostname]
+  end
+
+  return ((self.targets[ip] or EMPTY)[port] or EMPTY)[hostname] or
+          ((self.wait_add_target_list[ip] or EMPTY)[port] or EMPTY)[hostname]
 end
 
 --- Add a target to the healthchecker.
@@ -267,6 +276,18 @@ function checker:add_target(ip, port, hostname, is_healthy, hostheader)
   end
 
   local internal_health = is_healthy and "healthy" or "unhealthy"
+  
+  --use the wait_add_target_list to store the target before added to the target_list actually.
+  self.wait_add_target_list[ip] = self.wait_add_target_list[ip] or {}
+  self.wait_add_target_list[ip][port] = self.wait_add_target_list[ip][port] or {}
+  local id = hostname or ip
+  self.wait_add_target_list[id][port][id] =  {
+    ip = ip,
+    port = port,
+    hostname = hostname,
+    hostheader = hostheader,
+    internal_health = internal_health
+  }
 
   local ok, err = locking_target_list(self, function(target_list)
 
@@ -287,7 +308,14 @@ function checker:add_target(ip, port, hostname, is_healthy, hostheader)
     if not ok then
       self:log(ERR, "failed to set initial health status in shm: ", err)
     end
-
+    -- to clear wait_add_target_list
+    self.wait_add_target_list[ip][port][id] = nil
+    if #self.wait_add_target_list[ip][port] == 0 then
+      self.wait_add_target_list[ip][port] = nil
+    end
+    if #self.wait_add_target_list[ip] == 0 then
+      self.wait_add_target_list[ip] = nil
+    end
     -- target does not exist, go add it
     target_list[#target_list + 1] = {
       ip = ip,
