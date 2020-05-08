@@ -1398,7 +1398,7 @@ function _M.new(opts)
   end
 
   -- other properties
-  self.targets = nil     -- list of targets, initially loaded, maintained by events
+  self.targets = {}     -- list of targets, initially loaded, maintained by events
   self.events = nil      -- hash table with supported events (prevent magic strings)
   self.stopping = true   -- flag to indicate to timers to stop checking
   self.timer_count = 0   -- number of running timers
