@@ -15,6 +15,7 @@ description = {
 }
 dependencies = {
   "lua-resty-worker-events == 0.3.1",
+  "penlight == 1.7.0",
 }
 build = {
    type = "builtin",

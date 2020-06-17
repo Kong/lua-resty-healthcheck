@@ -38,6 +38,7 @@ local resty_lock = require ("resty.lock")
 local re_find = ngx.re.find
 local bit = require("bit")
 local ngx_now = ngx.now
+local ssl = require("ngx.ssl")
 
 -- constants
 local EVENT_SOURCE_PREFIX = "lua-resty-healthcheck"
@@ -828,14 +829,23 @@ function checker:run_single_check(ip, port, hostname, hostheader)
   end
 
   if self.checks.active.type == "https" then
-    local session
-    session, err = sock:sslhandshake(nil, hostname,
+    local session, err
+    if self.ssl_cert and self.ssl_key then
+      session, err = sock:tlshandshake({
+        verify = self.checks.active.https_verify_certificate,
+        client_cert = self.ssl_cert,
+        client_priv_key = self.ssl_key
+      })
+    else
+      session, err = sock:sslhandshake(nil, hostname,
                                      self.checks.active.https_verify_certificate)
+    end
     if not session then
       sock:close()
       self:log(ERR, "failed SSL handshake with '", hostname, " (", ip, ":", port, ")': ", err)
       return self:report_tcp_failure(ip, port, hostname, "connect", "active")
     end
+
   end
 
   local path = self.checks.active.http_path
@@ -1274,6 +1284,8 @@ end
 -- * `name`: name of the health checker
 -- * `shm_name`: the name of the `lua_shared_dict` specified in the Nginx configuration to use
 -- * `checks.active.type`: "http", "https" or "tcp" (default is "http")
+-- * `ssl_cert`: certificate for mTLS connections (string or parsed object)
+-- * `ssl_key`: key for mTLS connections (string or parsed object)
 -- * `checks.active.timeout`: socket timeout for active checks (in seconds)
 -- * `checks.active.concurrency`: number of targets to check concurrently
 -- * `checks.active.http_path`: path to use in `GET` HTTP request to run on active checks
@@ -1338,6 +1350,22 @@ function _M.new(opts)
 
   self.shm = ngx.shared[tostring(opts.shm_name)]
   assert(self.shm, ("no shm found by name '%s'"):format(opts.shm_name))
+
+  -- load certificate and key
+  if opts.ssl_cert and opts.ssl_key then
+    if type(opts.ssl_cert) == "cdata" then
+      self.ssl_cert = opts.ssl_cert
+    else
+      self.ssl_cert = assert(ssl.parse_pem_cert(opts.ssl_cert))
+    end
+
+    if type(opts.ssl_key) == "cdata" then
+      self.ssl_key = opts.ssl_key
+    else
+      self.ssl_key = assert(ssl.parse_pem_priv_key(opts.ssl_key))
+    end
+
+  end
 
   -- other properties
   self.targets = nil     -- list of targets, initially loaded, maintained by events
