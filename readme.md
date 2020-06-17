@@ -88,6 +88,13 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.3.0 (17-Jun-2020)
+
+* Adds support to mTLS to active healthchecks. This feature  can be used adding
+  the fields `ssl_cert` and `ssl_key`, with certificate and key respectively,
+  when creating a new healthcheck object.
+  [#41](https://github.com/Kong/lua-resty-healthcheck/pull/41)
+
 ### 1.2.0 (13-Feb-2020)
 
  * Adds `set_all_target_statuses_for_hostname`, which sets the targets for
