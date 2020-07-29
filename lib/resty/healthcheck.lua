@@ -38,6 +38,7 @@ local resty_lock = require ("resty.lock")
 local re_find = ngx.re.find
 local bit = require("bit")
 local ngx_now = ngx.now
+local ngx_worker_exiting = ngx.worker.exiting
 local ssl = require("ngx.ssl")
 
 -- constants
@@ -903,6 +904,10 @@ end
 -- executes a work package (a list of checks) sequentially
 function checker:run_work_package(work_package)
   for _, work_item in ipairs(work_package) do
+    if ngx_worker_exiting() then
+      self:log(DEBUG, "worker exting, skip check")
+      break
+    end
     self:log(DEBUG, "Checking ", work_item.hostname or "", " ",
                     work_item.hostheader and "(host header: ".. work_item.hostheader .. ")"
                     or "", work_item.ip, ":", work_item.port,
