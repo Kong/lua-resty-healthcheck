@@ -102,6 +102,8 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 ### Unreleased
 
 * fix: properly log line numbers by using tail calls [#29](https://github.com/Kong/lua-resty-healthcheck/pull/29)
+* fix: when not providing a hostname, use IP [#48](https://github.com/Kong/lua-resty-healthcheck/pull/48)
+* fix: makefile; make install
 
 ### 1.3.0 (17-Jun-2020)
 
