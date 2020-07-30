@@ -842,7 +842,7 @@ function checker:run_single_check(ip, port, hostname, hostheader)
     end
     if not session then
       sock:close()
-      self:log(ERR, "failed SSL handshake with '", hostname, " (", ip, ":", port, ")': ", err)
+      self:log(ERR, "failed SSL handshake with '", hostname or "", " (", ip, ":", port, ")': ", err)
       return self:report_tcp_failure(ip, port, hostname, "connect", "active")
     end
 
@@ -854,7 +854,7 @@ function checker:run_single_check(ip, port, hostname, hostheader)
   local bytes
   bytes, err = sock:send(request)
   if not bytes then
-    self:log(ERR, "failed to send http request to '", hostname, " (", ip, ":", port, ")': ", err)
+    self:log(ERR, "failed to send http request to '", hostname or "", " (", ip, ":", port, ")': ", err)
     if err == "timeout" then
       sock:close()  -- timeout errors do not close the socket.
       return self:report_timeout(ip, port, hostname, "active")
@@ -865,7 +865,7 @@ function checker:run_single_check(ip, port, hostname, hostheader)
   local status_line
   status_line, err = sock:receive()
   if not status_line then
-    self:log(ERR, "failed to receive status line from '", hostname, " (",ip, ":", port, ")': ", err)
+    self:log(ERR, "failed to receive status line from '", hostname or "", " (",ip, ":", port, ")': ", err)
     if err == "timeout" then
       sock:close()  -- timeout errors do not close the socket.
       return self:report_timeout(ip, port, hostname, "active")
@@ -880,13 +880,13 @@ function checker:run_single_check(ip, port, hostname, hostheader)
   if from then
     status = tonumber(status_line:sub(from, to))
   else
-    self:log(ERR, "bad status line from '", hostname, " (", ip, ":", port, ")': ", status_line)
+    self:log(ERR, "bad status line from '", hostname or "", " (", ip, ":", port, ")': ", status_line)
     -- note: 'status' will be reported as 'nil'
   end
 
   sock:close()
 
-  self:log(DEBUG, "Reporting '", hostname, " (", ip, ":", port, ")' (got HTTP ", status, ")")
+  self:log(DEBUG, "Reporting '", hostname or "", " (", ip, ":", port, ")' (got HTTP ", status, ")")
 
   return self:report_http_status(ip, port, hostname, status, "active")
 end
@@ -894,7 +894,7 @@ end
 -- executes a work package (a list of checks) sequentially
 function checker:run_work_package(work_package)
   for _, work_item in ipairs(work_package) do
-    self:log(DEBUG, "Checking ", work_item.hostname, " ",
+    self:log(DEBUG, "Checking ", work_item.hostname or "", " ",
                     work_item.hostheader and "(host header: ".. work_item.hostheader .. ")"
                     or "", work_item.ip, ":", work_item.port,
                     " (currently ", work_item.debug_health, ")")
@@ -1034,7 +1034,7 @@ function checker:event_handler(event_name, ip, port, hostname)
   if event_name == self.events.remove then
     if target_found then
       -- remove hash part
-      self.targets[target_found.ip][target_found.port][target_found.hostname] = nil
+      self.targets[target_found.ip][target_found.port][target_found.hostname or target_found.ip] = nil
       if not next(self.targets[target_found.ip][target_found.port]) then
         -- no more hostnames on this port, so delete it
         self.targets[target_found.ip][target_found.port] = nil
@@ -1415,7 +1415,7 @@ function _M.new(opts)
         -- fill-in the hash part for easy lookup
         self.targets[target.ip] = self.targets[target.ip] or {}
         self.targets[target.ip][target.port] = self.targets[target.ip][target.port] or {}
-        self.targets[target.ip][target.port][target.hostname] = target
+        self.targets[target.ip][target.port][target.hostname or target.ip] = target
       end
 
       return true
