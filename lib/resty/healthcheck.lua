@@ -829,20 +829,26 @@ function checker:run_single_check(ip, port, hostname, hostheader)
   end
 
   if self.checks.active.type == "https" then
-    local session, err
+    local https_sni, session, err
+    if self.checks.active.https_sni then
+      https_sni = self.checks.active.https_sni
+    else
+      https_sni = hostheader or hostname
+    end
     if self.ssl_cert and self.ssl_key then
       session, err = sock:tlshandshake({
         verify = self.checks.active.https_verify_certificate,
         client_cert = self.ssl_cert,
-        client_priv_key = self.ssl_key
+        client_priv_key = self.ssl_key,
+        server_name = https_sni
       })
     else
-      session, err = sock:sslhandshake(nil, hostname,
+      session, err = sock:sslhandshake(nil, https_sni,
                                      self.checks.active.https_verify_certificate)
     end
     if not session then
       sock:close()
-      self:log(ERR, "failed SSL handshake with '", hostname or "", " (", ip, ":", port, ")': ", err)
+      self:log(ERR, "failed SSL handshake with '", hostname or "", " (", ip, ":", port, ")', using server name (sni) '", https_sni, "': ", err)
       return self:report_tcp_failure(ip, port, hostname, "connect", "active")
     end
 
@@ -1218,6 +1224,7 @@ local defaults = {
       timeout = 1,
       concurrency = 10,
       http_path = "/",
+      https_sni = NO_DEFAULT,
       https_verify_certificate = true,
       healthy = {
         interval = 0, -- 0 = disabled by default
