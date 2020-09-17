@@ -48,8 +48,7 @@ install:
   - popd
   - export PATH=$OPENRESTY_PREFIX/nginx/sbin:$LUAROCKS_PREFIX/bin:$PATH
   - sudo luarocks install luacheck > build.log 2>&1 || (cat build.log && exit 1)
-  - sudo luarocks install lua-resty-worker-events > build.log 2>&1 || (cat build.log && exit 1)
-  - sudo luarocks install penlight > build.log 2>&1 || (cat build.log && exit 1)
+  - sudo luarocks make
   - luarocks --version
   - nginx -V
 

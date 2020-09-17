@@ -1,5 +1,5 @@
 package = "lua-resty-healthcheck"
-version = "scm-1"
+version = "scm-2"
 source = {
    url = "git://github.com/kong/lua-resty-healthcheck",
 }
@@ -14,7 +14,7 @@ description = {
    homepage = "https://github.com/Kong/lua-resty-healthcheck"
 }
 dependencies = {
-  "lua-resty-worker-events == 0.3.1",
+   "lua-resty-worker-events  >= 0.3.2, < 2.0",
   "penlight == 1.7.0",
 }
 build = {
