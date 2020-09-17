@@ -68,12 +68,14 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2117, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
+            we.poll()
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            we.poll()
             ngx.say(checker:get_target_status("127.0.0.1", 2117, nil))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2113, nil))  -- false
         }
@@ -145,12 +147,14 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2117, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
+            we.poll()
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            we.poll()
             ngx.say(checker:get_target_status("127.0.0.1", 2117, nil))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2113, nil))  -- false
         }
@@ -220,12 +224,14 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2117, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
+            we.poll()
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            we.poll()
             ngx.say(checker:get_target_status("127.0.0.1", 2117, nil))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2113, nil))  -- true
         }
