@@ -1,7 +1,8 @@
 package = "lua-resty-healthcheck"
-version = "scm-1"
+version = "1.3.0-2"
 source = {
-  url = "git://github.com/kong/lua-resty-healthcheck",
+  url = "https://github.com/Kong/lua-resty-healthcheck/archive/1.3.0-2.tar.gz",
+  dir = "lua-resty-healthcheck-1.3.0-2"
 }
 description = {
   summary = "Healthchecks for OpenResty to check upstream service status",
@@ -10,8 +11,8 @@ description = {
     availability by sending requests and validating responses at timed
     intervals.
   ]],
-  license = "Apache 2.0",
-  homepage = "https://github.com/Kong/lua-resty-healthcheck"
+  homepage = "https://github.com/Kong/lua-resty-healthcheck",
+  license = "Apache 2.0"
 }
 dependencies = {
   "lua-resty-worker-events ~> 1",
@@ -20,7 +21,7 @@ dependencies = {
 build = {
   type = "builtin",
   modules = {
-    ["resty.healthcheck"]       = "lib/resty/healthcheck.lua",
-    ["resty.healthcheck.utils"] = "lib/resty/healthcheck/utils.lua",
+    ["resty.healthcheck"] = "lib/resty/healthcheck.lua",
+    ["resty.healthcheck.utils"] = "lib/resty/healthcheck/utils.lua"
   }
 }

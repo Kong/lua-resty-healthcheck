@@ -88,6 +88,11 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.3.0-2 (17-Aug-2020)
+
+* Changes dependency on `lua-resty-worker-events` from `>= 0.3.2"` to ` ~> 1`
+  as the `2.0.0` will cause issues on other projects and their test suites.
+
 ### 1.3.0 (17-Jun-2020)
 
 * Adds support to mTLS to active healthchecks. This feature  can be used adding
