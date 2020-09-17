@@ -20,7 +20,7 @@
 -- - Events will be raised in every worker, see [lua-resty-worker-events](https://github.com/Kong/lua-resty-worker-events)
 -- for details.
 --
--- @copyright 2017 Kong Inc.
+-- @copyright 2017-2020 Kong Inc.
 -- @author Hisham Muhammad, Thijs Schreijer
 -- @license Apache 2.0
 
@@ -1433,7 +1433,7 @@ function _M.new(opts)
     worker_events.register_weak(self.ev_callback, self.EVENT_SOURCE)
 
     -- handle events to sync up in case there was a change by another worker
-    worker_events:poll()
+    worker_events.poll()
   end
 
   -- start timers

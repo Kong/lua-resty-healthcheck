@@ -56,6 +56,7 @@ qq{
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2114, nil, true)
+            we.poll()
             ngx.sleep(0.5) -- wait for 5x the check interval
             ngx.say(checker:get_target_status("127.0.0.1", 2114))  -- false
         }
@@ -111,6 +112,7 @@ qq{
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2114, nil, false)
+            we.poll()
             ngx.sleep(0.5) -- wait for 5x the check interval
             ngx.say(checker:get_target_status("127.0.0.1", 2114))  -- true
         }
@@ -165,6 +167,7 @@ qq{
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2114, nil, true)
+            we.poll()
             ngx.sleep(0.5) -- wait for 5x the check interval
             ngx.say(checker:get_target_status("127.0.0.1", 2114))  -- true
         }
@@ -221,6 +224,7 @@ qq{
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2114, nil, true)
+            we.poll()
             ngx.sleep(0.5) -- wait for 5x the check interval
             ngx.say(checker:get_target_status("127.0.0.1", 2114))  -- false
         }
@@ -282,6 +286,7 @@ qq{
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2114, "example.com", false)
+            we.poll()
             ngx.sleep(0.3) -- wait for 3x the check interval
             ngx.say(checker:get_target_status("127.0.0.1", 2114, "example.com"))  -- true
         }
@@ -325,6 +330,7 @@ qq{
             })
             -- Note: no http server configured, so port 2114 remains unanswered
             local ok, err = checker:add_target("127.0.0.1", 2114, nil, true)
+            we.poll()
             ngx.sleep(0.5) -- wait for 5x the check interval
             ngx.say(checker:get_target_status("127.0.0.1", 2114))  -- false
         }
@@ -380,6 +386,7 @@ qq{
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2114, nil, false)
+            we.poll()
             ngx.sleep(0.5) -- wait for 5x the check interval
             ngx.say(checker:get_target_status("127.0.0.1", 2114))  -- true
         }
@@ -441,6 +448,7 @@ qq{
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2114, "example.com", false, "custom-host.test")
+            we.poll()
             ngx.sleep(0.3) -- wait for 3x the check interval
             ngx.say(checker:get_target_status("127.0.0.1", 2114, "example.com"))  -- true
         }

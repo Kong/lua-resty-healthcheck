@@ -67,6 +67,8 @@ qq{
 
             local ok, err = checker:add_target(host, port, nil, true)
 
+            we.poll()
+
             -- S = successes counter
             -- F = http_failures counter
             -- T = tcp_failures counter
@@ -112,6 +114,9 @@ qq{
             -- that implements the specified behavior.
             local function run_test_case(case)
                 assert(checker:set_target_status(host, port, nil, true))
+
+                we.poll()
+
                 local i = 1
                 local s, f, t, o = 0, 0, 0, 0
                 local mode = true
@@ -149,6 +154,8 @@ qq{
                     --local ctr, state = checker:test_get_counter(host, port, nil)
                     --ngx.say(case, ": ", c, " ", string.format("%08x", ctr), " ", state)
                     --ngx.log(ngx.DEBUG, case, ": ", c, " ", string.format("%08x", ctr), " ", state)
+
+                    we.poll()
 
                     if checker:get_target_status(host, port, nil) ~= mode then
                         ngx.say("failed: ", case, " step ", i, " expected ", mode)
