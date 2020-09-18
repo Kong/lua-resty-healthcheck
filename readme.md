@@ -88,6 +88,10 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### Unreleased
+
+* fix: properly log line numbers by using tail calls [#29](https://github.com/Kong/lua-resty-healthcheck/pull/29)
+
 ### 1.3.0 (17-Jun-2020)
 
 * Adds support to mTLS to active healthchecks. This feature  can be used adding
