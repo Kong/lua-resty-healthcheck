@@ -101,6 +101,11 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
 ### Unreleased
 
+* BREAKING: Bump `lua-resty-worker-events` dependency to `2.0.0`. This makes
+  a lot of the APIs in this library asynchronous as the worker events `post`
+  and `post_local` won't anymore call `poll` on a running worker automatically,
+  for more information, see:
+  https://github.com/Kong/lua-resty-worker-events#200-16-september-2020
 * fix: properly log line numbers by using tail calls [#29](https://github.com/Kong/lua-resty-healthcheck/pull/29)
 * fix: when not providing a hostname, use IP [#48](https://github.com/Kong/lua-resty-healthcheck/pull/48)
 * fix: makefile; make install
@@ -193,7 +198,7 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 ## Copyright and License
 
 ```
-Copyright 2017-2019 Kong Inc.
+Copyright 2017-2020 Kong Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
