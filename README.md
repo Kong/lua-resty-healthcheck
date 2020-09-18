@@ -91,6 +91,17 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### Releasing new versions:
+
+* update changelog below (PR's should be merged including a changelog entry)
+* based on changelog determine new SemVer version
+* create a new rockspec
+* render the docs using `ldoc` (don't do this within PR's)
+* commit as "release x.x.x" (do not include rockspec revision)
+* tag the commit with "x.x.x" (do not include rockspec revision)
+* push commit and tag
+* upload rock to luarocks: `luarocks upload rockspecs/[name] --api-key=abc`
+
 ### 1.6.3 (06-Sep-2023)
 
 * Feature: Added support for https_sni [#49](https://github.com/Kong/lua-resty-healthcheck/pull/49) (backport)
