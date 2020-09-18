@@ -830,11 +830,7 @@ function checker:run_single_check(ip, port, hostname, hostheader)
 
   if self.checks.active.type == "https" then
     local https_sni, session, err
-    if self.checks.active.https_sni then
-      https_sni = self.checks.active.https_sni
-    else
-      https_sni = hostheader or hostname
-    end
+    https_sni = self.checks.active.https_sni or hostheader or hostname
     if self.ssl_cert and self.ssl_key then
       session, err = sock:tlshandshake({
         verify = self.checks.active.https_verify_certificate,
@@ -1290,12 +1286,13 @@ end
 --
 -- * `name`: name of the health checker
 -- * `shm_name`: the name of the `lua_shared_dict` specified in the Nginx configuration to use
--- * `checks.active.type`: "http", "https" or "tcp" (default is "http")
 -- * `ssl_cert`: certificate for mTLS connections (string or parsed object)
 -- * `ssl_key`: key for mTLS connections (string or parsed object)
+-- * `checks.active.type`: "http", "https" or "tcp" (default is "http")
 -- * `checks.active.timeout`: socket timeout for active checks (in seconds)
 -- * `checks.active.concurrency`: number of targets to check concurrently
 -- * `checks.active.http_path`: path to use in `GET` HTTP request to run on active checks
+-- * `checks.active.https_sni`: SNI server name incase of HTTPS
 -- * `checks.active.https_verify_certificate`: boolean indicating whether to verify the HTTPS certificate
 -- * `checks.active.healthy.interval`: interval between checks for healthy targets (in seconds)
 -- * `checks.active.healthy.http_statuses`: which HTTP statuses to consider a success
