@@ -88,6 +88,17 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### Releasing new versions:
+
+* update changelog below (PR's should be merged including a changelog entry)
+* based on changelog determine new SemVer version
+* create a new rockspec
+* render the docs using `ldoc` (don't do this within PR's)
+* commit as "release x.x.x" (do not include rockspec revision)
+* tag the commit with "x.x.x" (do not include rockspec revision)
+* push commit and tag
+* upload rock to luarocks: `luarocks upload rockspecs/[name] --api-key=abc`
+
 ### Unreleased
 
 * fix: properly log line numbers by using tail calls [#29](https://github.com/Kong/lua-resty-healthcheck/pull/29)
