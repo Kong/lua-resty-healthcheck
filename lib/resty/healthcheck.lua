@@ -850,8 +850,15 @@ function checker:run_single_check(ip, port, hostname, hostheader)
 
   end
 
+  local req_headers = self.checks.active.headers
+  local headers = table.concat(req_headers, "\r\n")
+  if #headers > 0 then
+    headers = headers .. "\r\n"
+  end
+
   local path = self.checks.active.http_path
-  local request = ("GET %s HTTP/1.0\r\nHost: %s\r\n\r\n"):format(path, hostheader or hostname)
+  local request = ("GET %s HTTP/1.0\r\n%sHost: %s\r\n\r\n"):format(path, headers, hostheader or hostname or ip)
+  self:log(DEBUG, "request head: ", request)
 
   local bytes
   bytes, err = sock:send(request)
@@ -1229,6 +1236,7 @@ local defaults = {
       http_path = "/",
       https_sni = NO_DEFAULT,
       https_verify_certificate = true,
+      headers = {""},
       healthy = {
         interval = 0, -- 0 = disabled by default
         http_statuses = { 200, 302 },
@@ -1301,6 +1309,7 @@ end
 -- * `checks.active.http_path`: path to use in `GET` HTTP request to run on active checks
 -- * `checks.active.https_sni`: SNI server name incase of HTTPS
 -- * `checks.active.https_verify_certificate`: boolean indicating whether to verify the HTTPS certificate
+-- * `checks.active.hheaders`: an array of headers (no hash-table! must be pre-formatted)
 -- * `checks.active.healthy.interval`: interval between checks for healthy targets (in seconds)
 -- * `checks.active.healthy.http_statuses`: which HTTP statuses to consider a success
 -- * `checks.active.healthy.successes`: number of successes to consider a target healthy
