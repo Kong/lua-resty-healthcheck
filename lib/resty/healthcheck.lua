@@ -829,20 +829,22 @@ function checker:run_single_check(ip, port, hostname, hostheader)
   end
 
   if self.checks.active.type == "https" then
-    local session, err
+    local https_sni, session, err
+    https_sni = self.checks.active.https_sni or hostheader or hostname
     if self.ssl_cert and self.ssl_key then
       session, err = sock:tlshandshake({
         verify = self.checks.active.https_verify_certificate,
         client_cert = self.ssl_cert,
-        client_priv_key = self.ssl_key
+        client_priv_key = self.ssl_key,
+        server_name = https_sni
       })
     else
-      session, err = sock:sslhandshake(nil, hostname,
+      session, err = sock:sslhandshake(nil, https_sni,
                                      self.checks.active.https_verify_certificate)
     end
     if not session then
       sock:close()
-      self:log(ERR, "failed SSL handshake with '", hostname or "", " (", ip, ":", port, ")': ", err)
+      self:log(ERR, "failed SSL handshake with '", hostname or "", " (", ip, ":", port, ")', using server name (sni) '", https_sni, "': ", err)
       return self:report_tcp_failure(ip, port, hostname, "connect", "active")
     end
 
@@ -1218,6 +1220,7 @@ local defaults = {
       timeout = 1,
       concurrency = 10,
       http_path = "/",
+      https_sni = NO_DEFAULT,
       https_verify_certificate = true,
       healthy = {
         interval = 0, -- 0 = disabled by default
@@ -1283,12 +1286,13 @@ end
 --
 -- * `name`: name of the health checker
 -- * `shm_name`: the name of the `lua_shared_dict` specified in the Nginx configuration to use
--- * `checks.active.type`: "http", "https" or "tcp" (default is "http")
 -- * `ssl_cert`: certificate for mTLS connections (string or parsed object)
 -- * `ssl_key`: key for mTLS connections (string or parsed object)
+-- * `checks.active.type`: "http", "https" or "tcp" (default is "http")
 -- * `checks.active.timeout`: socket timeout for active checks (in seconds)
 -- * `checks.active.concurrency`: number of targets to check concurrently
 -- * `checks.active.http_path`: path to use in `GET` HTTP request to run on active checks
+-- * `checks.active.https_sni`: SNI server name incase of HTTPS
 -- * `checks.active.https_verify_certificate`: boolean indicating whether to verify the HTTPS certificate
 -- * `checks.active.healthy.interval`: interval between checks for healthy targets (in seconds)
 -- * `checks.active.healthy.http_statuses`: which HTTP statuses to consider a success
