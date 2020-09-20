@@ -1639,7 +1639,7 @@ function _M.new(opts)
   end
 
   -- other properties
-  self.targets = nil     -- list of targets, initially loaded, maintained by events
+  self.targets = {}     -- list of targets, initially loaded, maintained by events
   self.events = nil      -- hash table with supported events (prevent magic strings)
   self.ev_callback = nil -- callback closure per checker instance
 
