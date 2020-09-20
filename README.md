@@ -106,6 +106,8 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
   and `post_local` won't anymore call `poll` on a running worker automatically,
   for more information, see:
   https://github.com/Kong/lua-resty-worker-events#200-16-september-2020
+* BREAKING: tcp_failures can no longer be 0 on http(s) checks (unless http(s)_failures
+  are also set to 0) [#55](https://github.com/Kong/lua-resty-healthcheck/pull/55)
 * feature: Added support for https_sni [#49](https://github.com/Kong/lua-resty-healthcheck/pull/49)
 * fix: properly log line numbers by using tail calls [#29](https://github.com/Kong/lua-resty-healthcheck/pull/29)
 * fix: when not providing a hostname, use IP [#48](https://github.com/Kong/lua-resty-healthcheck/pull/48)
