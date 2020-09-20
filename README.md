@@ -117,6 +117,7 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 * feature: added a status version field [#54](https://github.com/Kong/lua-resty-healthcheck/pull/54)
 * feature: add headers for probe request [#54](https://github.com/Kong/lua-resty-healthcheck/pull/54)
 * fix: exit early when reloading during a probe [#47](https://github.com/Kong/lua-resty-healthcheck/pull/47)
+* fix: prevent target-list from being nil, due to async behaviour [#44](https://github.com/Kong/lua-resty-healthcheck/pull/44)
 
 ### 1.3.0 (17-Jun-2020)
 
