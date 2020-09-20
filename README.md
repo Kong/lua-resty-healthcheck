@@ -84,6 +84,20 @@ programmatic API using functions such as `checker:report_http_status(host, port,
 See the [online LDoc documentation](http://kong.github.io/lua-resty-healthcheck)
 for the complete API.
 
+## Async behaviour
+
+Since this library heavily uses the SHM to share data between workers, it must
+use locks. The locks themselves need access to `ngx.sleep` which is not available
+in all contexts. Most notably not during startup; `init` and `init_worker`.
+
+The library will try and acquire the lock and update, but if it fails it will
+schedule an async update (timer with delay 0).
+
+One workaround for this in the initial phases would be to replace `ngx.sleep` with
+a version that does a blocking sleep in `init`/`init_worker`. This will enable
+the usage of locks in those phases.
+
+
 ## History
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)

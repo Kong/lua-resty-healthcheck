@@ -252,6 +252,8 @@ end
 --- Add a target to the healthchecker.
 -- When the ip + port + hostname combination already exists, it will simply
 -- return success (without updating `is_healthy` status).
+--
+-- *NOTE*: in non-yieldable contexts, this will be executed async.
 -- @param ip IP address of the target to check.
 -- @param port the port to check against.
 -- @param hostname (optional) hostname to set as the host header in the HTTP
@@ -339,6 +341,8 @@ end
 
 --- Remove a target from the healthchecker.
 -- The target not existing is not considered an error.
+--
+-- *NOTE*: in non-yieldable contexts, this will be executed async.
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 -- @param hostname (optional) hostname of the target being checked.
@@ -385,6 +389,8 @@ end
 
 
 --- Clear all healthcheck data.
+--
+-- *NOTE*: in non-yieldable contexts, this will be executed async.
 -- @return `true` on success, or `nil + error` on failure.
 function checker:clear()
 
@@ -510,6 +516,8 @@ end
 -- Increment the healthy or unhealthy counter. If the threshold of occurrences
 -- is reached, it changes the status of the target in the shm and posts an
 -- event.
+--
+-- *NOTE*: in non-yieldable contexts, this will be executed async.
 -- @param self The checker object
 -- @param health_report "healthy" for the success counter that drives a target
 -- towards the healthy state; "unhealthy" for the failure counter.
@@ -595,6 +603,8 @@ end
 -- If `unhealthy.tcp_failures` (for TCP failures) or `unhealthy.http_failures`
 -- is set to zero in the configuration, this function is a no-op
 -- and returns `true`.
+--
+-- *NOTE*: in non-yieldable contexts, this will be executed async.
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 -- @param hostname (optional) hostname of the target being checked.
@@ -622,6 +632,8 @@ end
 -- required to make a target "rise".
 -- If `healthy.successes` is set to zero in the configuration,
 -- this function is a no-op and returns `true`.
+--
+-- *NOTE*: in non-yieldable contexts, this will be executed async.
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 -- @param hostname (optional) hostname of the target being checked.
@@ -643,6 +655,8 @@ end
 -- or `unhealthy.http_failures` (fur unhealthy HTTP status codes)
 -- is set to zero in the configuration, this function is a no-op
 -- and returns `true`.
+--
+-- *NOTE*: in non-yieldable contexts, this will be executed async.
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 -- @param hostname (optional) hostname of the target being checked.
@@ -676,6 +690,8 @@ end
 --- Report a failure on TCP level.
 -- If `unhealthy.tcp_failures` is set to zero in the configuration,
 -- this function is a no-op and returns `true`.
+--
+-- *NOTE*: in non-yieldable contexts, this will be executed async.
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 -- @param hostname hostname of the target being checked.
@@ -699,6 +715,8 @@ end
 --- Report a timeout failure.
 -- If `unhealthy.timeouts` is set to zero in the configuration,
 -- this function is a no-op and returns `true`.
+--
+-- *NOTE*: in non-yieldable contexts, this will be executed async.
 -- @param ip IP address of the target being checked.
 -- @param port the port being checked against.
 -- @param hostname (optional) hostname of the target being checked.
@@ -714,6 +732,8 @@ end
 
 
 --- Sets the current status of all targets with the given hostname and port.
+--
+-- *NOTE*: in non-yieldable contexts, this will be executed async.
 -- @param hostname hostname being checked.
 -- @param port the port being checked against
 -- @param is_healthy boolean: `true` for healthy, `false` for unhealthy
@@ -740,7 +760,9 @@ end
 
 
 --- Sets the current status of the target.
--- This will immediately set the status and clear its counters.
+-- This will set the status and clear its counters.
+--
+-- *NOTE*: in non-yieldable contexts, this will be executed async.
 -- @param ip IP address of the target being checked
 -- @param port the port being checked against
 -- @param hostname (optional) hostname of the target being checked.
@@ -1302,6 +1324,9 @@ end
 --
 -- *NOTE*: the returned `checker` object must be anchored, if not it will be
 -- removed by Lua's garbage collector and the healthchecks will cease to run.
+--
+-- *NOTE*: in non-yieldable contexts, the initial loading of the target
+-- statusses will be executed async.
 -- @param opts table with checker options. Options are:
 --
 -- * `name`: name of the health checker
