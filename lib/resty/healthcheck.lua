@@ -1341,18 +1341,7 @@ function _M.new(opts)
   assert(worker_events.configured(), "please configure the " ..
       "'lua-resty-worker-events' module before using 'lua-resty-healthcheck'")
 
-  local active_type = (((opts or EMPTY).checks or EMPTY).active or EMPTY).type
-  local passive_type = (((opts or EMPTY).checks or EMPTY).passive or EMPTY).type
-
   local self = fill_in_settings(opts, defaults)
-
-  -- If using deprecated self.type, that takes precedence over
-  -- a default value. TODO: remove this in a future version
-  if self.type then
-    self.checks.active.type = active_type or self.type
-    self.checks.passive.type = passive_type or self.type
-    check_valid_type("type", self.type)
-  end
 
   assert(self.checks.active.healthy.successes < 255,        "checks.active.healthy.successes must be at most 254")
   assert(self.checks.active.unhealthy.tcp_failures < 255,   "checks.active.unhealthy.tcp_failures must be at most 254")
