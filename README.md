@@ -135,6 +135,8 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 * fix: replace timer and node-wide locks with resty-timer, to prevent interval
   skips [#59](https://github.com/Kong/lua-resty-healthcheck/pull/59)
 * change: added additional logging on posting events [#25](https://github.com/Kong/lua-resty-healthcheck/issues/25)
+* fix: do not run out of timers during init/init_worker when adding a vast
+  amount of targets [#57](https://github.com/Kong/lua-resty-healthcheck/pull/57)
 
 ### 1.3.0 (17-Jun-2020)
 
