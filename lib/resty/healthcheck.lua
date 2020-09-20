@@ -1363,6 +1363,22 @@ function _M.new(opts)
   assert(self.checks.passive.unhealthy.http_failures < 255, "checks.passive.unhealthy.http_failures must be at most 254")
   assert(self.checks.passive.unhealthy.timeouts < 255,      "checks.passive.unhealthy.timeouts must be at most 254")
 
+  -- since counter types are independent (tcp failure does not also increment http failure)
+  -- a TCP threshold of 0 is not allowed for enabled http checks.
+  -- It would make tcp failures go unnoticed because the http failure counter is not
+  -- incremented and a tcp threshold of 0 means disabled, and hence it would never trip.
+  -- See https://github.com/Kong/lua-resty-healthcheck/issues/30
+  if self.checks.passive.type == "http" or self.checks.passive.type == "https" then
+    if self.checks.passive.unhealthy.http_failures > 0 then
+      assert(self.checks.passive.unhealthy.tcp_failures > 0, "self.checks.passive.unhealthy.tcp_failures must be >0 for http(s) checks with http_failures >0")
+    end
+  end
+  if self.checks.active.type == "http" or self.checks.active.type == "https" then
+    if self.checks.active.unhealthy.http_failures > 0 then
+      assert(self.checks.active.unhealthy.tcp_failures > 0, "self.checks.active.unhealthy.tcp_failures must be > 0 for http(s) checks with http_failures >0")
+    end
+  end
+
   if opts.test then
     self.test_get_counter = test_get_counter
   end
