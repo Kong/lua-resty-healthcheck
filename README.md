@@ -101,6 +101,8 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
 ### Unreleased
 
+* BREAKING: fallback for deprecated top-level field `type` is now removed
+  (deprecated since `0.5.0`) [#56](https://github.com/Kong/lua-resty-healthcheck/pull/56)
 * BREAKING: Bump `lua-resty-worker-events` dependency to `2.0.0`. This makes
   a lot of the APIs in this library asynchronous as the worker events `post`
   and `post_local` won't anymore call `poll` on a running worker automatically,

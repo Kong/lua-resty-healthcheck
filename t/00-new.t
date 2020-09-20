@@ -119,7 +119,7 @@ GET /t
 --- error_log
 Healthchecker started!
 
-=== TEST 6: new() only accepts http or tcp types
+=== TEST 6: new() only accepts http(s) or tcp types
 --- http_config eval: $::HttpConfig
 --- config
     location = /t {
@@ -130,19 +130,41 @@ Healthchecker started!
             local ok, err = pcall(healthcheck.new, {
                 name = "testing",
                 shm_name = "test_shm",
-                type = "http",
+                checks = {
+                    active = {
+                        type = "http",
+                    },
+                }
             })
             ngx.say(ok)
             local ok, err = pcall(healthcheck.new, {
                 name = "testing",
                 shm_name = "test_shm",
-                type = "tcp",
+                checks = {
+                    active = {
+                        type = "https",
+                    },
+                }
             })
             ngx.say(ok)
             local ok, err = pcall(healthcheck.new, {
                 name = "testing",
                 shm_name = "test_shm",
-                type = "get lost",
+                checks = {
+                    active = {
+                        type = "tcp",
+                    },
+                }
+            })
+            ngx.say(ok)
+            local ok, err = pcall(healthcheck.new, {
+                name = "testing",
+                shm_name = "test_shm",
+                checks = {
+                    active = {
+                        type = "get lost",
+                    },
+                }
             })
             ngx.say(ok)
         }
@@ -150,6 +172,7 @@ Healthchecker started!
 --- request
 GET /t
 --- response_body
+true
 true
 true
 false

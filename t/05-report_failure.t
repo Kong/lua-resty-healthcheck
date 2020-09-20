@@ -40,9 +40,9 @@ qq{
             local checker = healthcheck.new({
                 name = "testing",
                 shm_name = "test_shm",
-                type = "http",
                 checks = {
                     active = {
+                        type = "http",
                         http_path = "/status",
                         healthy  = {
                             interval = 999, -- we don't want active checks
@@ -55,6 +55,7 @@ qq{
                         }
                     },
                     passive = {
+                        type = "http",
                         healthy  = {
                             successes = 3,
                         },
@@ -119,9 +120,9 @@ qq{
             local checker = healthcheck.new({
                 name = "testing",
                 shm_name = "test_shm",
-                type = "tcp",
                 checks = {
                     active = {
+                        type = "tcp",
                         http_path = "/status",
                         healthy  = {
                             interval = 999, -- we don't want active checks
@@ -134,6 +135,7 @@ qq{
                         }
                     },
                     passive = {
+                        type = "tcp",
                         healthy  = {
                             successes = 3,
                         },
@@ -196,9 +198,9 @@ qq{
             local checker = healthcheck.new({
                 name = "testing",
                 shm_name = "test_shm",
-                type = "tcp",
                 checks = {
                     active = {
+                        type = "tcp",
                         http_path = "/status",
                         healthy  = {
                             interval = 999, -- we don't want active checks
@@ -211,6 +213,7 @@ qq{
                         }
                     },
                     passive = {
+                        type = "tcp",
                         healthy  = {
                             successes = 3,
                         },
