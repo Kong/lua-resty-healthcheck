@@ -134,6 +134,52 @@ local worker_color = use_color and function(str) return ("\027["..tostring(31 + 
 -- Debug function
 local function dump(...) print(require("pl.pretty").write({...})) end -- luacheck: ignore 211
 
+-- cache timers in "init", "init_worker" phases so we use only a single timer
+-- and do not run the risk of exhausting them for large sets
+-- see https://github.com/Kong/lua-resty-healthcheck/issues/40
+-- Below we'll temporarily use a patched version of ngx.timer.at, until we're
+-- past the init and init_worker phases, after which we'll return to the regular
+-- ngx.timer.at implementation
+local ngx_timer_at do
+  local callback_list = {}
+
+  local function handler(premature)
+    if premature then
+      return
+    end
+
+    local list = callback_list
+    callback_list = {}
+
+    for _, args in ipairs(list) do
+      local ok, err = pcall(args[1], ngx_worker_exiting(), unpack(args, 2, args.n))
+      if not ok then
+        ngx.log(ngx.ERR, "timer failure: ", err)
+      end
+    end
+  end
+
+  ngx_timer_at = function(...)
+    local phase = ngx.get_phase()
+    if phase ~= "init" and phase ~= "init_worker" then
+      -- we're past init/init_worker, so replace this temp function with the
+      -- real-deal again, so from here on we run regular timers.
+      ngx_timer_at = ngx.timer.at
+      return ngx.timer.at(...)
+    end
+
+    local n = #callback_list
+    callback_list[n+1] = { n = select("#", ...), ... }
+    if n == 0 then
+      -- first one, so schedule the actual timer
+      return ngx.timer.at(0, handler)
+    end
+    return true
+  end
+
+end
+
+
 local _M = {}
 
 
@@ -230,7 +276,7 @@ local function locking_target_list(self, fn)
 
   local ok, err = run_fn_locked_target_list(false, self, fn)
   if err == "failed to acquire lock" then
-    local _, terr = ngx.timer.at(0, run_fn_locked_target_list, self, fn)
+    local _, terr = ngx_timer_at(0, run_fn_locked_target_list, self, fn)
     if terr ~= nil then
       return nil, terr
     end
@@ -491,7 +537,7 @@ end
 local function locking_target(self, ip, port, hostname, fn)
   local ok, err = run_mutexed_fn(false, self, ip, port, hostname, fn)
   if err == "failed to acquire lock" then
-    local _, terr = ngx.timer.at(0, run_mutexed_fn, self, ip, port, hostname, fn)
+    local _, terr = ngx_timer_at(0, run_mutexed_fn, self, ip, port, hostname, fn)
     if terr ~= nil then
       return nil, terr
     end
