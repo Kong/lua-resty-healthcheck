@@ -1,7 +1,7 @@
 use Test::Nginx::Socket::Lua 'no_plan';
 use Cwd qw(cwd);
 
-workers(2);
+workers(1);
 master_on();
 
 my $pwd = cwd();
@@ -30,10 +30,14 @@ our $HttpConfig = qq{
                     }
                 }
             })
+            ngx.sleep(0)
+            we.poll()
             local ok, err = checker:add_target("127.0.0.1", 11111)
             if not ok then
                 error(err)
             end
+            ngx.sleep(0)
+            we.poll()
         end)
     }
 };
@@ -59,4 +63,3 @@ true
 checking unhealthy targets: nothing to do
 checking unhealthy targets: #1
 from 'true' to 'false', ver: 2
-from 'true' to 'false', ver: 1
