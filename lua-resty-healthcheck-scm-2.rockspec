@@ -16,11 +16,11 @@ description = {
 dependencies = {
   "lua-resty-worker-events ~> 2",
   "penlight ~> 1.7",
+  "lua-resty-timer ~> 1",
 }
 build = {
   type = "builtin",
   modules = {
     ["resty.healthcheck"]       = "lib/resty/healthcheck.lua",
-    ["resty.healthcheck.utils"] = "lib/resty/healthcheck/utils.lua",
   }
 }
