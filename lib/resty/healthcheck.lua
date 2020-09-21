@@ -1103,9 +1103,9 @@ function checker:event_handler(event_name, ip, port, hostname)
     if not target_found then
       -- it is a new target, must add it first
       target_found = { ip = ip, port = port, hostname = hostname }
-      self.targets[target_found.ip] = self.targets[target_found.ip] or {}
-      self.targets[target_found.ip][target_found.port] = self.targets[target_found.ip][target_found.port] or {}
-      self.targets[target_found.ip][target_found.port][target_found.hostname or ip] = target_found
+      self.targets[ip] = self.targets[ip] or {}
+      self.targets[ip][port] = self.targets[ip][port] or {}
+      self.targets[ip][port][hostname or ip] = target_found
       self.targets[#self.targets + 1] = target_found
       self:log(DEBUG, "event: target added '", hostname or "", "(", ip, ":", port, ")'")
     end
