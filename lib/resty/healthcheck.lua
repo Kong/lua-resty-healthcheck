@@ -32,12 +32,11 @@ local tostring = tostring
 local ipairs = ipairs
 local cjson = require("cjson.safe").new()
 local table_remove = table.remove
-local utils = require("resty.healthcheck.utils")
+local resty_timer = require("resty.timer")
 local worker_events = require("resty.worker.events")
 local resty_lock = require ("resty.lock")
 local re_find = ngx.re.find
 local bit = require("bit")
-local ngx_now = ngx.now
 local ngx_worker_exiting = ngx.worker.exiting
 local ssl = require("ngx.ssl")
 
@@ -979,86 +978,37 @@ end
 -- results of the checks.
 
 
--- @param health_mode either "healthy" or "unhealthy" to indicate what
--- lock to get.
--- @return `true` on success, or false if the lock was not acquired, or `nil + error`
--- in case of errors
-function checker:get_periodic_lock(health_mode)
-  local key = self.PERIODIC_LOCK .. health_mode
-  local interval = self.checks.active[health_mode].interval
-
-  -- The lock is held for the whole interval to prevent multiple
-  -- worker processes from sending the test request simultaneously.
-  -- UNLESS: the probing takes longer than the timer interval.
-  -- Here we substract the lock expiration time by 1ms to prevent
-  -- a race condition with the next timer event.
-  local ok, err = self.shm:add(key, true, interval - 0.001)
-  if not ok then
-    if err == "exists" then
-      return false
-    end
-    self:log(ERR, "failed to add key '", key, "': ", err)
-    return nil
-  end
-  return true
-end
-
-
 --- Active health check callback function.
--- @param premature default openresty param
 -- @param self the checker object this timer runs on
 -- @param health_mode either "healthy" or "unhealthy" to indicate what check
-local function checker_callback(premature, self, health_mode)
-  if premature or self.stopping then
-    self.timer_count = self.timer_count - 1
-    return
+local function checker_callback(self, health_mode)
+
+  -- create a list of targets to check, here we can still do this atomically
+  local list_to_check = {}
+  local targets = fetch_target_list(self)
+  for _, target in ipairs(targets) do
+    local tgt = get_target(self, target.ip, target.port, target.hostname)
+    local internal_health = tgt and tgt.internal_health or nil
+    if (health_mode == "healthy" and (internal_health == "healthy" or
+                                      internal_health == "mostly_healthy"))
+    or (health_mode == "unhealthy" and (internal_health == "unhealthy" or
+                                        internal_health == "mostly_unhealthy"))
+    then
+      list_to_check[#list_to_check + 1] = {
+        ip = target.ip,
+        port = target.port,
+        hostname = target.hostname,
+        hostheader = target.hostheader,
+        debug_health = internal_health,
+      }
+    end
   end
 
-  local interval
-  if not self:get_periodic_lock(health_mode) then
-    -- another worker just ran, or is running the healthcheck
-    interval = self.checks.active[health_mode].interval
-
+  if not list_to_check[1] then
+    self:log(DEBUG, "checking ", health_mode, " targets: nothing to do")
   else
-    -- we're elected to run the active healthchecks
-    -- create a list of targets to check, here we can still do this atomically
-    local start_time = ngx_now()
-    local list_to_check = {}
-    local targets = fetch_target_list(self)
-    for _, target in ipairs(targets) do
-      local tgt = get_target(self, target.ip, target.port, target.hostname)
-      local internal_health = tgt and tgt.internal_health or nil
-      if (health_mode == "healthy" and (internal_health == "healthy" or
-                                        internal_health == "mostly_healthy"))
-      or (health_mode == "unhealthy" and (internal_health == "unhealthy" or
-                                          internal_health == "mostly_unhealthy"))
-      then
-        list_to_check[#list_to_check + 1] = {
-          ip = target.ip,
-          port = target.port,
-          hostname = target.hostname,
-          hostheader = target.hostheader,
-          debug_health = internal_health,
-        }
-      end
-    end
-
-    if not list_to_check[1] then
-      self:log(DEBUG, "checking ", health_mode, " targets: nothing to do")
-    else
-      self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
-      self:active_check_targets(list_to_check)
-    end
-
-    local run_time = ngx_now() - start_time
-    interval = math.max(0, self.checks.active[health_mode].interval - run_time)
-  end
-
-  -- reschedule timer
-  local ok, err = utils.gctimer(interval, checker_callback, self, health_mode)
-  if not ok then
-    self.timer_count = self.timer_count - 1
-    self:log(ERR, "failed to re-create '", health_mode, "' timer: ", err)
+    self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
+    self:active_check_targets(list_to_check)
   end
 end
 
@@ -1159,7 +1109,14 @@ end
 -- after the current timers have expired they will be marked as stopped.
 -- @return `true`
 function checker:stop()
-  self.stopping = true
+  if self.active_healthy_timer then
+    self.active_healthy_timer:cancel()
+    self.active_healthy_timer = nil
+  end
+  if self.active_unhealthy_timer then
+    self.active_unhealthy_timer:cancel()
+    self.active_unhealthy_timer = nil
+  end
   self:log(DEBUG, "timers stopped")
   return true
 end
@@ -1168,31 +1125,33 @@ end
 --- Start the background health checks.
 -- @return `true`, or `nil + error`.
 function checker:start()
-  if self.timer_count ~= 0 then
-    return nil, "cannot start, " .. self.timer_count .. " (of 2) timers are still running"
+  if self.active_healthy_timer or self.active_unhealthy_timer then
+    return nil, "cannot start, timers are still running"
   end
 
-  local ok, err
-  if self.checks.active.healthy.interval > 0 then
-    ok, err = utils.gctimer(0, checker_callback, self, "healthy")
-    if not ok then
-      return nil, "failed to create 'healthy' timer: " .. err
+  for _, health_mode in ipairs({ "healthy", "unhealthy" }) do
+    if self.checks.active[health_mode].interval > 0 then
+      local timer, err = resty_timer({
+        interval = self.checks.active[health_mode].interval,
+        recurring = true,
+        immediate = true,
+        detached = false,
+        expire = checker_callback,
+        cancel = nil,
+        shm_name = self.shm_name,
+        key_name = self.PERIODIC_LOCK .. health_mode,
+        sub_interval = math.min(self.checks.active[health_mode].interval, 0.5),
+      }, self, health_mode)
+      if not timer then
+        return nil, "failed to create '" .. health_mode .. "' timer: " .. err
+      end
+      self["active_" .. health_mode .. "_timer"] = timer
     end
-    self.timer_count = self.timer_count + 1
-  end
-
-  if self.checks.active.unhealthy.interval > 0 then
-    ok, err = utils.gctimer(0, checker_callback, self, "unhealthy")
-    if not ok then
-      return nil, "failed to create 'unhealthy' timer: " .. err
-    end
-    self.timer_count = self.timer_count + 1
   end
 
   worker_events.unregister(self.ev_callback, self.EVENT_SOURCE)  -- ensure we never double subscribe
   worker_events.register_weak(self.ev_callback, self.EVENT_SOURCE)
 
-  self.stopping = false  -- do this at the end, so if either creation fails, the other stops also
   self:log(DEBUG, "timers started")
   return true
 end
@@ -1425,8 +1384,6 @@ function _M.new(opts)
   -- other properties
   self.targets = {}     -- list of targets, initially loaded, maintained by events
   self.events = nil      -- hash table with supported events (prevent magic strings)
-  self.stopping = true   -- flag to indicate to timers to stop checking
-  self.timer_count = 0   -- number of running timers
   self.ev_callback = nil -- callback closure per checker instance
 
   -- Convert status lists to sets
