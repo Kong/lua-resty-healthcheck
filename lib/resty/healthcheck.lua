@@ -1100,7 +1100,10 @@ end
 -- Raises an event for a target status change.
 function checker:raise_event(event_name, ip, port, hostname)
   local target = { ip = ip, port = port, hostname = hostname }
-  worker_events.post(self.EVENT_SOURCE, event_name, target)
+  local ok, err = worker_events.post(self.EVENT_SOURCE, event_name, target)
+  if not ok then
+    self:log(ERR, "failed to post event '", event_name, "' with: ", err)
+  end
 end
 
 
