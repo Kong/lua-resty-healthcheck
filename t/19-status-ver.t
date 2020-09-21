@@ -1,7 +1,7 @@
 use Test::Nginx::Socket::Lua 'no_plan';
 use Cwd qw(cwd);
 
-workers(2);
+workers(1);
 master_on();
 
 my $pwd = cwd();
@@ -59,4 +59,3 @@ true
 checking unhealthy targets: nothing to do
 checking unhealthy targets: #1
 from 'true' to 'false', ver: 2
-from 'true' to 'false', ver: 1
