@@ -113,7 +113,7 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 * push commit and tag
 * upload rock to luarocks: `luarocks upload rockspecs/[name] --api-key=abc`
 
-### Unreleased
+### 2.0.0 (22-Sep-2020)
 
 * BREAKING: fallback for deprecated top-level field `type` is now removed
   (deprecated since `0.5.0`) [#56](https://github.com/Kong/lua-resty-healthcheck/pull/56)

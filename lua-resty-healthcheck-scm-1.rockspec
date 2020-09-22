@@ -1,7 +1,8 @@
 package = "lua-resty-healthcheck"
-version = "scm-2"
+version = "scm-1"
 source = {
   url = "git://github.com/kong/lua-resty-healthcheck",
+  branch = "master",
 }
 description = {
   summary = "Healthchecks for OpenResty to check upstream service status",
@@ -21,6 +22,6 @@ dependencies = {
 build = {
   type = "builtin",
   modules = {
-    ["resty.healthcheck"]       = "lib/resty/healthcheck.lua",
+    ["resty.healthcheck"] = "lib/resty/healthcheck.lua",
   }
 }
