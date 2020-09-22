@@ -230,16 +230,16 @@ local function run_fn_locked_target_list(premature, self, fn)
     return
   end
 
-  local lock, lock_err = resty_lock:new(self.shm_name, {
+  local tl_lock, lock_err = resty_lock:new(self.shm_name, {
     exptime = 10,  -- timeout after which lock is released anyway
     timeout = 5,   -- max wait time to acquire lock
   })
 
-  if not lock then
+  if not tl_lock then
     return nil, "failed to create lock:" .. lock_err
   end
 
-  local pok, perr = pcall(resty_lock.lock, lock, self.TARGET_LIST_LOCK)
+  local pok, perr = pcall(tl_lock.lock, tl_lock, self.TARGET_LIST_LOCK)
   if not pok then
     self:log(DEBUG, "failed to acquire lock: ", perr)
     return nil, "failed to acquire lock"
@@ -256,7 +256,7 @@ local function run_fn_locked_target_list(premature, self, fn)
   end
 
   local ok
-  ok, err = lock:unlock()
+  ok, err = tl_lock:unlock()
   if not ok then
     -- recoverable: not returning this error, only logging it
     self:log(ERR, "failed to release lock '", self.TARGET_LIST_LOCK,
@@ -498,16 +498,16 @@ local function run_mutexed_fn(premature, self, ip, port, hostname, fn)
     return
   end
 
-  local lock, lock_err = resty_lock:new(self.shm_name, {
+  local tlock, lock_err = resty_lock:new(self.shm_name, {
                   exptime = 10,  -- timeout after which lock is released anyway
                   timeout = 5,   -- max wait time to acquire lock
                 })
-  if not lock then
+  if not tlock then
     return nil, "failed to create lock:" .. lock_err
   end
   local lock_key = key_for(self.TARGET_LOCK, ip, port, hostname)
 
-  local pok, perr = pcall(resty_lock.lock, lock, lock_key)
+  local pok, perr = pcall(tlock.lock, tlock, lock_key)
   if not pok then
     self:log(DEBUG, "failed to acquire lock: ", perr)
     return nil, "failed to acquire lock"
@@ -515,7 +515,7 @@ local function run_mutexed_fn(premature, self, ip, port, hostname, fn)
 
   local final_ok, final_err = pcall(fn)
 
-  local ok, err = lock:unlock()
+  local ok, err = tlock:unlock()
   if not ok then
     -- recoverable: not returning this error, only logging it
     self:log(ERR, "failed to release lock '", lock_key, "': ", err)
