@@ -32,13 +32,13 @@ local tostring = tostring
 local ipairs = ipairs
 local cjson = require("cjson.safe").new()
 local table_remove = table.remove
-local utils = require("resty.healthcheck.utils")
 local worker_events = require("resty.worker.events")
 local resty_lock = require ("resty.lock")
 local re_find = ngx.re.find
 local bit = require("bit")
 local ngx_now = ngx.now
 local ssl = require("ngx.ssl")
+local resty_timer = require "resty.timer"
 
 -- constants
 local EVENT_SOURCE_PREFIX = "lua-resty-healthcheck"
@@ -136,6 +136,12 @@ local function dump(...) print(require("pl.pretty").write({...})) end -- luachec
 
 local _M = {}
 
+-- checker objects (weak) table
+local hcs = setmetatable({}, {
+  __mode = "v",
+})
+
+local active_check_timer
 
 -- TODO: improve serialization speed
 -- serialize a table to a string
@@ -969,60 +975,46 @@ end
 
 
 --- Active health check callback function.
--- @param premature default openresty param
 -- @param self the checker object this timer runs on
 -- @param health_mode either "healthy" or "unhealthy" to indicate what check
-local function checker_callback(premature, self, health_mode)
-  if premature or self.stopping then
-    self.timer_count = self.timer_count - 1
-    return
+local function checker_callback(self, health_mode)
+  local list_to_check = {}
+  local targets = fetch_target_list(self)
+  for _, target in ipairs(targets) do
+    local tgt = get_target(self, target.ip, target.port, target.hostname)
+    local internal_health = tgt and tgt.internal_health or nil
+    if (health_mode == "healthy" and (internal_health == "healthy" or
+                                      internal_health == "mostly_healthy"))
+    or (health_mode == "unhealthy" and (internal_health == "unhealthy" or
+                                        internal_health == "mostly_unhealthy"))
+    then
+      list_to_check[#list_to_check + 1] = {
+        ip = target.ip,
+        port = target.port,
+        hostname = target.hostname,
+        hostheader = target.hostheader,
+        debug_health = internal_health,
+      }
+    end
   end
 
-  local interval
-  if not self:get_periodic_lock(health_mode) then
-    -- another worker just ran, or is running the healthcheck
-    interval = self.checks.active[health_mode].interval
-
+  if not list_to_check[1] then
+    self:log(DEBUG, "checking ", health_mode, " targets: nothing to do")
   else
-    -- we're elected to run the active healthchecks
-    -- create a list of targets to check, here we can still do this atomically
-    local start_time = ngx_now()
-    local list_to_check = {}
-    local targets = fetch_target_list(self)
-    for _, target in ipairs(targets) do
-      local tgt = get_target(self, target.ip, target.port, target.hostname)
-      local internal_health = tgt and tgt.internal_health or nil
-      if (health_mode == "healthy" and (internal_health == "healthy" or
-                                        internal_health == "mostly_healthy"))
-      or (health_mode == "unhealthy" and (internal_health == "unhealthy" or
-                                          internal_health == "mostly_unhealthy"))
-      then
-        list_to_check[#list_to_check + 1] = {
-          ip = target.ip,
-          port = target.port,
-          hostname = target.hostname,
-          hostheader = target.hostheader,
-          debug_health = internal_health,
-        }
-      end
+    local timer, err = resty_timer({
+      interval = 0,
+      recurring = false,
+      immediate = false,
+      detached = true,
+      expire = function()
+        self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
+        self:active_check_targets(list_to_check)
+        self.checks.active[health_mode].last_run = ngx_now()
+      end,
+    })
+    if timer == nil then
+      self:log(ERR, "failed to create timer to check ", health_mode)
     end
-
-    if not list_to_check[1] then
-      self:log(DEBUG, "checking ", health_mode, " targets: nothing to do")
-    else
-      self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
-      self:active_check_targets(list_to_check)
-    end
-
-    local run_time = ngx_now() - start_time
-    interval = math.max(0, self.checks.active[health_mode].interval - run_time)
-  end
-
-  -- reschedule timer
-  local ok, err = utils.gctimer(interval, checker_callback, self, health_mode)
-  if not ok then
-    self.timer_count = self.timer_count - 1
-    self:log(ERR, "failed to re-create '", health_mode, "' timer: ", err)
   end
 end
 
@@ -1117,8 +1109,9 @@ end
 -- after the current timers have expired they will be marked as stopped.
 -- @return `true`
 function checker:stop()
-  self.stopping = true
-  self:log(DEBUG, "timers stopped")
+  self.checks.active.healthy.active = false
+  self.checks.active.unhealthy.active = false
+  self:log(DEBUG, "healthchecker stopped")
   return true
 end
 
@@ -1126,32 +1119,21 @@ end
 --- Start the background health checks.
 -- @return `true`, or `nil + error`.
 function checker:start()
-  if self.timer_count ~= 0 then
-    return nil, "cannot start, " .. self.timer_count .. " (of 2) timers are still running"
-  end
-
-  local ok, err
   if self.checks.active.healthy.interval > 0 then
-    ok, err = utils.gctimer(0, checker_callback, self, "healthy")
-    if not ok then
-      return nil, "failed to create 'healthy' timer: " .. err
-    end
-    self.timer_count = self.timer_count + 1
+    self.checks.active.healthy.active = true
+    -- the first active check happens only after `interval`
+    self.checks.active.healthy.last_run = ngx_now()
   end
 
   if self.checks.active.unhealthy.interval > 0 then
-    ok, err = utils.gctimer(0, checker_callback, self, "unhealthy")
-    if not ok then
-      return nil, "failed to create 'unhealthy' timer: " .. err
-    end
-    self.timer_count = self.timer_count + 1
+    self.checks.active.unhealthy.active = true
+    self.checks.active.unhealthy.last_run = ngx_now()
   end
 
   worker_events.unregister(self.ev_callback, self.EVENT_SOURCE)  -- ensure we never double subscribe
   worker_events.register_weak(self.ev_callback, self.EVENT_SOURCE)
 
-  self.stopping = false  -- do this at the end, so if either creation fails, the other stops also
-  self:log(DEBUG, "timers started")
+  self:log(DEBUG, "active check flagged as active")
   return true
 end
 
@@ -1370,8 +1352,6 @@ function _M.new(opts)
   -- other properties
   self.targets = nil     -- list of targets, initially loaded, maintained by events
   self.events = nil      -- hash table with supported events (prevent magic strings)
-  self.stopping = true   -- flag to indicate to timers to stop checking
-  self.timer_count = 0   -- number of running timers
   self.ev_callback = nil -- callback closure per checker instance
 
   -- Convert status lists to sets
@@ -1436,12 +1416,48 @@ function _M.new(opts)
     worker_events:poll()
   end
 
-  -- start timers
+  -- turn on active health check
   local ok, err = self:start()
   if not ok then
     self:stop()
     return nil, err
   end
+
+  -- if active checker is needed and not running, start it
+  if (self.checks.active.healthy.active or self.checks.active.unhealthy.active)
+    and active_check_timer == nil then
+
+    self:log(DEBUG, "starting active check timer")
+    local err
+    active_check_timer, err = resty_timer({
+      recurring = true,
+      interval = 0.1, -- evaluate active checks every 0.1s
+      detached = false,
+      expire = function()
+        local cur_time = ngx_now()
+        for _, checker_obj in ipairs(hcs) do
+          if checker_obj.checks.active.healthy.active and
+             (checker_obj.checks.active.healthy.last_run +
+             checker_obj.checks.active.healthy.interval <= cur_time)
+          then
+            checker_callback(checker_obj, "healthy")
+          end
+
+          if checker_obj.checks.active.unhealthy.active and
+             (checker_obj.checks.active.unhealthy.last_run +
+             checker_obj.checks.active.unhealthy.interval <= cur_time)
+          then
+            checker_callback(checker_obj, "unhealthy")
+          end
+        end
+      end,
+    })
+    if not active_check_timer then
+      self:log(ERR, "Could not start active check timer: ", err)
+    end
+  end
+
+  table.insert(hcs, self)
 
   -- TODO: push entire config in debug level logs
   self:log(DEBUG, "Healthchecker started!")
