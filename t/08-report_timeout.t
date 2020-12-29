@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * 22;
+plan tests => repeat_each() * 16;
 
 my $pwd = cwd();
 
@@ -84,8 +84,6 @@ GET /t
 false
 false
 --- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
 unhealthy TIMEOUT increment (1/2) for '(127.0.0.1:2122)'
 unhealthy TIMEOUT increment (2/2) for '(127.0.0.1:2122)'
 event: target status '(127.0.0.1:2122)' from 'true' to 'false'
@@ -154,9 +152,6 @@ qq{
 GET /t
 --- response_body
 true
---- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
 --- no_error_log
 unhealthy TCP increment
 event: target status '(127.0.0.1:2122)' from 'true' to 'false'
@@ -223,9 +218,6 @@ qq{
 GET /t
 --- response_body
 true
---- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
 --- no_error_log
 unhealthy TCP increment
 event: target status '(127.0.0.1:2122)' from 'true' to 'false'

@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * 32;
+plan tests => repeat_each() * 28;
 
 my $pwd = cwd();
 
@@ -84,8 +84,6 @@ GET /t
 true
 true
 --- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
 healthy SUCCESS increment (1/3) for '(127.0.0.1:2116)'
 healthy SUCCESS increment (2/3) for '(127.0.0.1:2116)'
 healthy SUCCESS increment (3/3) for '(127.0.0.1:2116)'
@@ -161,8 +159,6 @@ GET /t
 true
 true
 --- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
 healthy SUCCESS increment (1/3) for '(127.0.0.1:2116)'
 healthy SUCCESS increment (2/3) for '(127.0.0.1:2116)'
 healthy SUCCESS increment (3/3) for '(127.0.0.1:2116)'
