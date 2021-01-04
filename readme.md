@@ -88,6 +88,12 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.4.0 (07-Jan-2021)
+
+* Use a single timer to actively health check targets. This reduces the number
+  of timers used by health checkers, as they used to use two timers by each
+  target. [#62](https://github.com/Kong/lua-resty-healthcheck/pull/62)
+
 ### 1.3.0 (17-Jun-2020)
 
 * Adds support to mTLS to active healthchecks. This feature  can be used adding
@@ -176,7 +182,7 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 ## Copyright and License
 
 ```
-Copyright 2017-2019 Kong Inc.
+Copyright 2017-2021 Kong Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
