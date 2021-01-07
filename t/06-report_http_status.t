@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * 53;
+plan tests => repeat_each() * 41;
 
 my $pwd = cwd();
 
@@ -84,8 +84,6 @@ GET /t
 false
 false
 --- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
 unhealthy HTTP increment (1/3) for '(127.0.0.1:2119)'
 unhealthy HTTP increment (2/3) for '(127.0.0.1:2119)'
 unhealthy HTTP increment (3/3) for '(127.0.0.1:2119)'
@@ -164,8 +162,6 @@ GET /t
 true
 true
 --- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
 healthy SUCCESS increment (1/4) for '(127.0.0.1:2119)'
 healthy SUCCESS increment (2/4) for '(127.0.0.1:2119)'
 healthy SUCCESS increment (3/4) for '(127.0.0.1:2119)'
@@ -237,9 +233,6 @@ qq{
 GET /t
 --- response_body
 false
---- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
 --- no_error_log
 healthy SUCCESS increment
 event: target status '127.0.0.1 (127.0.0.1:2119)' from 'false' to 'true'
@@ -304,9 +297,6 @@ qq{
 GET /t
 --- response_body
 false
---- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
 --- no_error_log
 healthy SUCCESS increment
 event: target status '127.0.0.1 (127.0.0.1:2119)' from 'false' to 'true'
@@ -371,9 +361,6 @@ qq{
 GET /t
 --- response_body
 true
---- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
 --- no_error_log
 unhealthy HTTP increment
 event: target status '127.0.0.1 (127.0.0.1:2119)' from 'true' to 'false'
@@ -438,9 +425,6 @@ qq{
 GET /t
 --- response_body
 true
---- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
 --- no_error_log
 unhealthy HTTP increment
 event: target status '(127.0.0.1:2119)' from 'true' to 'false'

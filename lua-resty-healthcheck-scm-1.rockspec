@@ -14,13 +14,13 @@ description = {
    homepage = "https://github.com/Kong/lua-resty-healthcheck"
 }
 dependencies = {
-  "lua-resty-worker-events == 0.3.1",
+  "lua-resty-worker-events == 1.0.0",
   "penlight == 1.7.0",
+  "lua-resty-timer ~> 1",
 }
 build = {
    type = "builtin",
    modules = {
-     ["resty.healthcheck"]       = "lib/resty/healthcheck.lua",
-     ["resty.healthcheck.utils"] = "lib/resty/healthcheck/utils.lua",
+     ["resty.healthcheck"] = "lib/resty/healthcheck.lua",
    }
 }
