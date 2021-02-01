@@ -44,6 +44,7 @@ local resty_timer = require "resty.timer"
 local EVENT_SOURCE_PREFIX = "lua-resty-healthcheck"
 local LOG_PREFIX = "[healthcheck] "
 local SHM_PREFIX = "lua-resty-healthcheck:"
+local TIMER_STARTED = "timer_started"
 local EMPTY = setmetatable({},{
     __newindex = function()
       error("the EMPTY table is read only, check your code!", 2)
@@ -1425,8 +1426,9 @@ function _M.new(opts)
 
   -- if active checker is needed and not running, start it
   if (self.checks.active.healthy.active or self.checks.active.unhealthy.active)
-    and active_check_timer == nil then
+    and active_check_timer == nil and not self.shm:get(TIMER_STARTED) then
 
+    self.shm:set(TIMER_STARTED, true)
     self:log(DEBUG, "starting active check timer")
     local err
     active_check_timer, err = resty_timer({
@@ -1453,6 +1455,7 @@ function _M.new(opts)
       end,
     })
     if not active_check_timer then
+      self.shm:set(TIMER_STARTED, false)
       self:log(ERR, "Could not start active check timer: ", err)
     end
   end
