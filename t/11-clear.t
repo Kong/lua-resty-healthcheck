@@ -151,7 +151,7 @@ qq{
             }
             local checker1 = healthcheck.new(config)
             checker1:add_target("127.0.0.1", 21120, nil, true)
-            ngx.sleep(0.3) -- wait 1.5x the interval
+            ngx.sleep(0.5) -- wait 2.5x the interval
             checker1:clear()
             checker1:add_target("127.0.0.1", 21120, nil, true)
             ngx.sleep(0.3) -- wait 1.5x the interval
