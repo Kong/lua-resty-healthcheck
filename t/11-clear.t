@@ -96,6 +96,7 @@ initial target list (11 targets)
             }
             local checker1 = healthcheck.new(config)
             local checker2 = healthcheck.new(config)
+            ngx.sleep(1) -- active healthchecks might take up to 1s to start
             for i = 1, 10 do
                 checker1:add_target("127.0.0.1", 20000 + i, nil, false)
             end
@@ -150,6 +151,7 @@ qq{
                 }
             }
             local checker1 = healthcheck.new(config)
+            ngx.sleep(1) -- active healthchecks might take up to 1s to start
             checker1:add_target("127.0.0.1", 21120, nil, true)
             ngx.sleep(0.3) -- wait 1.5x the interval
             checker1:clear()

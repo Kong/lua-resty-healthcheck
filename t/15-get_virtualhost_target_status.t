@@ -195,9 +195,10 @@ qq{
                     },
                 }
             })
+            ngx.sleep(1) -- active healthchecks might take up to 1s to start
             local ok, err = checker:add_target("127.0.0.1", 2117, "healthyserver", true)
             local ok, err = checker:add_target("127.0.0.1", 2117, "unhealthyserver", true)
-            ngx.sleep(0.5) -- wait for 5x the check interval
+            ngx.sleep(0.6) -- wait for 6x the check interval
             ngx.say(checker:get_target_status("127.0.0.1", 2117, "healthyserver"))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2117, "unhealthyserver"))  -- false
             local _, err = checker:get_target_status("127.0.0.1", 2117)

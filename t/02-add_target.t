@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * (blocks() * 4) + 6;
+plan tests => repeat_each() * (blocks() * 4) + 3;
 
 my $pwd = cwd();
 
@@ -39,7 +39,7 @@ __DATA__
                     }
                 }
             })
-            ngx.sleep(0.2) -- wait twice the interval
+            ngx.sleep(1) -- active healthchecks might take up to 1s to start
             local ok, err = checker:add_target("127.0.0.1", 11111, nil, false)
             ngx.say(ok)
             ngx.sleep(0.2) -- wait twice the interval
@@ -51,7 +51,6 @@ GET /t
 true
 --- error_log
 checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
 checking unhealthy targets: #1
 
 --- no_error_log
@@ -92,7 +91,7 @@ qq{
                     }
                 }
             })
-            ngx.sleep(0.2) -- wait twice the interval
+            ngx.sleep(1) -- active healthchecks might take up to 1s to start
             local ok, err = checker:add_target("127.0.0.1", 2112, nil, true)
             ngx.say(ok)
             ngx.sleep(0.2) -- wait twice the interval
@@ -103,7 +102,6 @@ GET /t
 --- response_body
 true
 --- error_log
-checking healthy targets: nothing to do
 checking unhealthy targets: nothing to do
 checking healthy targets: #1
 
@@ -148,7 +146,7 @@ qq{
                     }
                 }
             })
-            ngx.sleep(0.2) -- wait twice the interval
+            ngx.sleep(1) -- active healthchecks might take up to 1s to start
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, false)
             ngx.say(ok)
@@ -160,7 +158,6 @@ GET /t
 --- response_body
 true
 --- error_log
-checking healthy targets: nothing to do
 checking unhealthy targets: nothing to do
 checking healthy targets: #1
 
