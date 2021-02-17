@@ -88,6 +88,11 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.4.1 (17-Feb-2021)
+
+* Fix: make sure that a single worker will actively check hosts' statuses.
+  [#67](https://github.com/Kong/lua-resty-healthcheck/pull/67)
+
 ### 1.4.0 (07-Jan-2021)
 
 * Use a single timer to actively health check targets. This reduces the number
