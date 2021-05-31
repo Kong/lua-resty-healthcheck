@@ -1138,6 +1138,7 @@ end
 function checker:stop()
   self.checks.active.healthy.active = false
   self.checks.active.unhealthy.active = false
+  worker_events.unregister(self.ev_callback, self.EVENT_SOURCE)
   self:log(DEBUG, "healthchecker stopped")
   return true
 end
