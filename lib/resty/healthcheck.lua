@@ -1005,6 +1005,10 @@ end
 -- @param self the checker object this timer runs on
 -- @param health_mode either "healthy" or "unhealthy" to indicate what check
 local function checker_callback(self, health_mode)
+  if self.checker_callback_count then
+    self.checker_callback_count = self.checker_callback_count + 1
+  end
+
   local list_to_check = {}
   local targets = fetch_target_list(self)
   for _, target in ipairs(targets) do
@@ -1348,6 +1352,7 @@ function _M.new(opts)
 
   if opts.test then
     self.test_get_counter = test_get_counter
+    self.checker_callback_count = 0
   end
 
   assert(self.name, "required option 'name' is missing")

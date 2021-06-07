@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * 56;
+plan tests => repeat_each() * 59;
 
 my $pwd = cwd();
 
@@ -462,3 +462,61 @@ event: target status 'example.com(127.0.0.1:2114)' from 'false' to 'true'
 checking unhealthy targets: nothing to do
 
 
+
+=== TEST 9: active probes, interval is respected
+--- http_config eval
+qq{
+    $::HttpConfig
+
+    server {
+        listen 2114;
+        location = /status {
+            access_by_lua_block {
+                ngx.sleep(0.3)
+                ngx.exit(200)
+            }
+        }
+    }
+}
+--- config
+    location = /t {
+        content_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+            local checker = healthcheck.new({
+                test = true,
+                name = "testing",
+                shm_name = "test_shm",
+                type = "http",
+                checks = {
+                    active = {
+                        http_path = "/status",
+                        healthy  = {
+                            interval = 1,
+                            successes = 1,
+                        },
+                        unhealthy  = {
+                            interval = 1,
+                            http_failures = 1,
+                        }
+                    },
+                }
+            })
+            ngx.sleep(1) -- active healthchecks might take up to 1s to start
+            local ok, err = checker:add_target("127.0.0.1", 2114, nil, true)
+            ngx.sleep(1) -- wait for the check interval
+            -- checker callback should not be called more than 5 times
+            if checker.checker_callback_count < 5 then
+                ngx.say("OK")
+            else
+                ngx.say("BAD")
+            end
+        }
+    }
+--- request
+GET /t
+--- response_body
+OK
+--- no_error_log
+[error]
