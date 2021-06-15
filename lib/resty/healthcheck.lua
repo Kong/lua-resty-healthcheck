@@ -1036,7 +1036,6 @@ local function checker_callback(self, health_mode)
       expire = function()
         self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
         self:active_check_targets(list_to_check)
-        self.checks.active[health_mode].last_run = ngx_now()
       end,
     })
     if timer == nil then
@@ -1479,6 +1478,7 @@ function _M.new(opts)
                   (checker_obj.checks.active.healthy.last_run +
                   checker_obj.checks.active.healthy.interval <= cur_time)
                 then
+                  checker_obj.checks.active.healthy.last_run = cur_time
                   checker_callback(checker_obj, "healthy")
                 end
 
@@ -1486,6 +1486,7 @@ function _M.new(opts)
                   (checker_obj.checks.active.unhealthy.last_run +
                   checker_obj.checks.active.unhealthy.interval <= cur_time)
                 then
+                  checker_obj.checks.active.unhealthy.last_run = cur_time
                   checker_callback(checker_obj, "unhealthy")
                 end
               end
