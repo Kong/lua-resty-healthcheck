@@ -55,7 +55,7 @@ qq{
                     },
                 }
             })
-            ngx.sleep(1) -- active healthchecks might take up to 1s to start
+            ngx.sleep(2) -- active healthchecks might take some time to start
             local ok, err = checker:add_target("127.0.0.1", 2114, nil, true)
             ngx.sleep(0.6) -- wait for 6x the check interval
             ngx.say(checker:get_target_status("127.0.0.1", 2114))  -- false
@@ -223,7 +223,7 @@ qq{
                     },
                 }
             })
-            ngx.sleep(1) -- active healthchecks might take up to 1s to start
+            ngx.sleep(2) -- active healthchecks might take some time to start
             local ok, err = checker:add_target("127.0.0.1", 2114, nil, true)
             ngx.sleep(0.6) -- wait for 6x the check interval
             ngx.say(checker:get_target_status("127.0.0.1", 2114))  -- false
