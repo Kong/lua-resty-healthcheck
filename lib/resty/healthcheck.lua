@@ -1138,6 +1138,7 @@ end
 function checker:stop()
   self.checks.active.healthy.active = false
   self.checks.active.unhealthy.active = false
+  worker_events.unregister(self.ev_callback, self.EVENT_SOURCE)
   self:log(DEBUG, "healthchecker stopped")
   return true
 end
@@ -1437,7 +1438,6 @@ function _M.new(opts)
       -- just a wrapper to be able to access `self` as a closure
       return self:event_handler(event, data.ip, data.port, data.hostname)
     end
-    worker_events.register_weak(self.ev_callback, self.EVENT_SOURCE)
 
     -- handle events to sync up in case there was a change by another worker
     worker_events:poll()
