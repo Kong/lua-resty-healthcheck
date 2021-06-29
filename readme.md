@@ -88,6 +88,14 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.4.2 (29-Jun-2021)
+
+* Fix: prevent new active checks being scheduled while a health check is running.
+  [#72](https://github.com/Kong/lua-resty-healthcheck/pull/72)
+* Fix: remove event watcher when stopping an active health check.
+  [#74](https://github.com/Kong/lua-resty-healthcheck/pull/74); fixes Kong issue
+  [#7406](https://github.com/Kong/kong/issues/7406)
+
 ### 1.4.1 (17-Feb-2021)
 
 * Fix: make sure that a single worker will actively check hosts' statuses.
