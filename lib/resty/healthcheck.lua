@@ -1474,7 +1474,7 @@ function _M.new(opts)
         end
 
         local cur_time = ngx_now()
-        for _, checker_obj in ipairs(hcs) do
+        for _, checker_obj in pairs(hcs) do
           if checker_obj.checks.active.healthy.active and
             (checker_obj.checks.active.healthy.last_run +
               checker_obj.checks.active.healthy.interval <= cur_time)
