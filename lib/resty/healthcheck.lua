@@ -1460,14 +1460,20 @@ function _M.new(opts)
 
     self:log(DEBUG, "starting timer to check active checks")
     local err
-    local check_healthcheck_timer, err = resty_timer({
+    local check_healthcheck_timer
+    check_healthcheck_timer, err = resty_timer({
       recurring = true,
       -- check if no worker is actively checking health status every 10 check
       -- periods
       interval = CHECK_INTERVAL * 10,
       jitter = CHECK_JITTER,
-      detached = false,
+      detached = true,
       expire = function()
+        if active_check_timer then
+          check_healthcheck_timer:cancel()
+          return
+        end
+
         if self:get_periodic_lock() and not active_check_timer then
           self:log(DEBUG, "worker ", ngx_worker_id(), " (pid: ", ngx_worker_pid(), ") ",
                   "starting active check timer")
@@ -1500,6 +1506,7 @@ function _M.new(opts)
           if not active_check_timer then
             self:log(ERR, "Could not start active check timer: ", err)
           end
+          check_healthcheck_timer:cancel()
         end
       end,
     })
