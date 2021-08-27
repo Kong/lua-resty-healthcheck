@@ -1032,7 +1032,7 @@ local function checker_callback(self, health_mode)
   if not list_to_check[1] then
     self:log(DEBUG, "checking ", health_mode, " targets: nothing to do")
   else
-    local timer, err = resty_timer({
+    local timer = resty_timer({
       interval = 0,
       recurring = false,
       immediate = false,
