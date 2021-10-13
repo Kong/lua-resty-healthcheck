@@ -1257,52 +1257,52 @@ local function fill_in_settings(opts, defaults, ctx)
   return obj
 end
 
-
-local defaults = {
-  name = NO_DEFAULT,
-  shm_name = NO_DEFAULT,
-  type = NO_DEFAULT,
-  status_ver = 0,
-  checks = {
-    active = {
-      type = "http",
-      timeout = 1,
-      concurrency = 10,
-      http_path = "/",
-      https_sni = NO_DEFAULT,
-      https_verify_certificate = true,
-      headers = {""},
-      healthy = {
-        interval = 0, -- 0 = disabled by default
-        http_statuses = { 200, 302 },
-        successes = 2,
+local function get_defaults()
+  return {
+    name = NO_DEFAULT,
+    shm_name = NO_DEFAULT,
+    type = NO_DEFAULT,
+    status_ver = 0,
+    checks = {
+      active = {
+        type = "http",
+        timeout = 1,
+        concurrency = 10,
+        http_path = "/",
+        https_sni = NO_DEFAULT,
+        https_verify_certificate = true,
+        headers = {""},
+        healthy = {
+          interval = 0, -- 0 = disabled by default
+          http_statuses = { 200, 302 },
+          successes = 2,
+        },
+        unhealthy = {
+          interval = 0, -- 0 = disabled by default
+          http_statuses = { 429, 404,
+                            500, 501, 502, 503, 504, 505 },
+          tcp_failures = 2,
+          timeouts = 3,
+          http_failures = 5,
+        },
       },
-      unhealthy = {
-        interval = 0, -- 0 = disabled by default
-        http_statuses = { 429, 404,
-                          500, 501, 502, 503, 504, 505 },
-        tcp_failures = 2,
-        timeouts = 3,
-        http_failures = 5,
+      passive = {
+        type = "http",
+        healthy = {
+          http_statuses = { 200, 201, 202, 203, 204, 205, 206, 207, 208, 226,
+                            300, 301, 302, 303, 304, 305, 306, 307, 308 },
+          successes = 5,
+        },
+        unhealthy = {
+          http_statuses = { 429, 500, 503 },
+          tcp_failures = 2,
+          timeouts = 7,
+          http_failures = 5,
+        },
       },
     },
-    passive = {
-      type = "http",
-      healthy = {
-        http_statuses = { 200, 201, 202, 203, 204, 205, 206, 207, 208, 226,
-                          300, 301, 302, 303, 304, 305, 306, 307, 308 },
-        successes = 5,
-      },
-      unhealthy = {
-        http_statuses = { 429, 500, 503 },
-        tcp_failures = 2,
-        timeouts = 7,
-        http_failures = 5,
-      },
-    },
-  },
-}
-
+  }
+end
 
 local function to_set(tbl, key)
   local set = {}
@@ -1374,6 +1374,8 @@ function _M.new(opts)
   assert(worker_events.configured(), "please configure the " ..
       "'lua-resty-worker-events' module before using 'lua-resty-healthcheck'")
 
+  -- create a new defaults table within new() as defaults table will be modified by to_set function later 
+  local defaults = get_defaults()
   local self = fill_in_settings(opts, defaults)
 
   assert(self.checks.active.healthy.successes < 255,        "checks.active.healthy.successes must be at most 254")
