@@ -58,10 +58,6 @@ local EMPTY = setmetatable({},{
 local CHECK_INTERVAL = 0.1
 -- use a 10% jitter to start each worker timer
 local CHECK_JITTER = CHECK_INTERVAL * 0.1
--- lock valid period: the worker which acquires the lock owns it for 15 times
--- the check interval. If it does not update the shm during this period, we
--- consider that it is not able to continue checking (the worker probably was killed)
-local LOCK_PERIOD = CHECK_INTERVAL * 15
 
 
 -- Counters: a 32-bit shm integer can hold up to four 8-bit counters.
@@ -848,7 +844,7 @@ function checker:run_single_check(ip, port, hostname, hostheader)
   end
 
   if self.checks.active.type == "https" then
-    local session, err
+    local session
     if self.ssl_cert and self.ssl_key then
       session, err = sock:tlshandshake({
         verify = self.checks.active.https_verify_certificate,
@@ -960,45 +956,6 @@ end
 -- The timer callbacks are responsible for checking the status, upon success/
 -- failure they will call the health-management functions to deal with the
 -- results of the checks.
-
-
--- @return `true` on success, or false if the lock was not acquired, or `nil + error`
--- in case of errors
-function checker:get_periodic_lock()
-  local key = self.PERIODIC_LOCK
-  local my_pid = ngx_worker_pid()
-  local checker_pid = self.shm:get(key)
-
-  if checker_pid == nil then
-    -- no worker is checking, try to acquire the lock
-    local ok, err = self.shm:add(key, my_pid, LOCK_PERIOD)
-    if not ok then
-      if err == "exists" then
-        -- another worker got the lock before
-        return false
-      end
-      self:log(ERR, "failed to add key '", key, "': ", err)
-      return nil, err
-    end
-  elseif checker_pid ~= my_pid then
-    -- another worker is checking
-    return false
-  end
-
-  return true
-end
-
-
--- touch the shm to refresh the valid period
-function checker:renew_periodic_lock()
-  local key = self.PERIODIC_LOCK
-  local my_pid = ngx_worker_pid()
-
-  local _, err = self.shm:set(key, my_pid, LOCK_PERIOD)
-  if err then
-    self:log(ERR, "failed to update key '", key, "': ", err)
-  end
-end
 
 
 --- Active health check callback function.
@@ -1458,53 +1415,36 @@ function _M.new(opts)
   if (self.checks.active.healthy.active or self.checks.active.unhealthy.active)
     and active_check_timer == nil then
 
-    self:log(DEBUG, "starting timer to check active checks")
-    local err
-    local check_healthcheck_timer, err = resty_timer({
+    self:log(DEBUG, "worker ", ngx_worker_id(), " (pid: ", ngx_worker_pid(), ") ",
+      "starting active check timer")
+    active_check_timer, err = resty_timer({
       recurring = true,
-      -- check if no worker is actively checking health status every 10 check
-      -- periods
-      interval = CHECK_INTERVAL * 10,
+      interval = CHECK_INTERVAL,
       jitter = CHECK_JITTER,
       detached = false,
       expire = function()
-        if self:get_periodic_lock() and not active_check_timer then
-          self:log(DEBUG, "worker ", ngx_worker_id(), " (pid: ", ngx_worker_pid(), ") ",
-                  "starting active check timer")
-          active_check_timer, err = resty_timer({
-            recurring = true,
-            interval = CHECK_INTERVAL,
-            detached = false,
-            expire = function()
-              self:renew_periodic_lock()
-              local cur_time = ngx_now()
-              for _, checker_obj in ipairs(hcs) do
-                if checker_obj.checks.active.healthy.active and
-                  (checker_obj.checks.active.healthy.last_run +
-                  checker_obj.checks.active.healthy.interval <= cur_time)
-                then
-                  checker_obj.checks.active.healthy.last_run = cur_time
-                  checker_callback(checker_obj, "healthy")
-                end
+        local cur_time = ngx_now()
+        for _, checker_obj in ipairs(hcs) do
+          if checker_obj.checks.active.healthy.active and
+            (checker_obj.checks.active.healthy.last_run +
+              checker_obj.checks.active.healthy.interval <= cur_time)
+          then
+            checker_obj.checks.active.healthy.last_run = cur_time
+            checker_callback(checker_obj, "healthy")
+          end
 
-                if checker_obj.checks.active.unhealthy.active and
-                  (checker_obj.checks.active.unhealthy.last_run +
-                  checker_obj.checks.active.unhealthy.interval <= cur_time)
-                then
-                  checker_obj.checks.active.unhealthy.last_run = cur_time
-                  checker_callback(checker_obj, "unhealthy")
-                end
-              end
-            end,
-          })
-          if not active_check_timer then
-            self:log(ERR, "Could not start active check timer: ", err)
+          if checker_obj.checks.active.unhealthy.active and
+            (checker_obj.checks.active.unhealthy.last_run +
+              checker_obj.checks.active.unhealthy.interval <= cur_time)
+          then
+            checker_obj.checks.active.unhealthy.last_run = cur_time
+            checker_callback(checker_obj, "unhealthy")
           end
         end
       end,
     })
-    if not check_healthcheck_timer then
-      self:log(ERR, "Could not check active checking: ", err)
+    if not active_check_timer then
+      self:log(ERR, "Could not start active check timer: ", err)
     end
   end
 
