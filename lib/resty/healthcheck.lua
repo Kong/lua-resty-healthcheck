@@ -58,7 +58,10 @@ local EMPTY = setmetatable({},{
 local CHECK_INTERVAL = 0.1
 -- use a 10% jitter to start each worker timer
 local CHECK_JITTER = CHECK_INTERVAL * 0.1
-
+-- lock valid period: the worker which acquires the lock owns it for 15 times
+-- the check interval. If it does not update the shm during this period, we
+-- consider that it is not able to continue checking (the worker probably was killed)
+local LOCK_PERIOD = CHECK_INTERVAL * 15
 
 -- Counters: a 32-bit shm integer can hold up to four 8-bit counters.
 local CTR_SUCCESS = 0x00000001
@@ -958,6 +961,43 @@ end
 -- results of the checks.
 
 
+-- @return `true` on success, or false if the lock was not acquired, or `nil + error`
+-- in case of errors
+local function get_periodic_lock(shm, key)
+  local my_pid = ngx_worker_pid()
+  local checker_pid = shm:get(key)
+
+  if checker_pid == nil then
+    -- no worker is checking, try to acquire the lock
+    local ok, err = shm:add(key, my_pid, LOCK_PERIOD)
+    if not ok then
+      if err == "exists" then
+        -- another worker got the lock before
+        return false
+      end
+      ngx_log(ERR, "failed to add key '", key, "': ", err)
+      return nil, err
+    end
+  elseif checker_pid ~= my_pid then
+    -- another worker is checking
+    return false
+  end
+
+  return true
+end
+
+
+-- touch the shm to refresh the valid period
+local function renew_periodic_lock(shm, key)
+  local my_pid = ngx_worker_pid()
+
+  local _, err = shm:set(key, my_pid, LOCK_PERIOD)
+  if err then
+    ngx_log(ERR, "failed to update key '", key, "': ", err)
+  end
+end
+
+
 --- Active health check callback function.
 -- @param self the checker object this timer runs on
 -- @param health_mode either "healthy" or "unhealthy" to indicate what check
@@ -1417,12 +1457,22 @@ function _M.new(opts)
 
     self:log(DEBUG, "worker ", ngx_worker_id(), " (pid: ", ngx_worker_pid(), ") ",
       "starting active check timer")
+    local shm, key = self.shm, self.PERIODIC_LOCK
     active_check_timer, err = resty_timer({
       recurring = true,
       interval = CHECK_INTERVAL,
       jitter = CHECK_JITTER,
       detached = false,
       expire = function()
+
+        if get_periodic_lock(shm, key) then
+          active_check_timer.interval = CHECK_INTERVAL
+          renew_periodic_lock(shm, key)
+        else
+          active_check_timer.interval = CHECK_INTERVAL * 10
+          return
+        end
+
         local cur_time = ngx_now()
         for _, checker_obj in ipairs(hcs) do
           if checker_obj.checks.active.healthy.active and
