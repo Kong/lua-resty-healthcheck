@@ -1347,7 +1347,7 @@ end
 -- * `checks.active.http_path`: path to use in `GET` HTTP request to run on active checks
 -- * `checks.active.https_sni`: SNI server name incase of HTTPS
 -- * `checks.active.https_verify_certificate`: boolean indicating whether to verify the HTTPS certificate
--- * `checks.active.hheaders`: an array of headers (no hash-table! must be pre-formatted)
+-- * `checks.active.headers`: an array of headers (no hash-table! must be pre-formatted)
 -- * `checks.active.healthy.interval`: interval between checks for healthy targets (in seconds)
 -- * `checks.active.healthy.http_statuses`: which HTTP statuses to consider a success
 -- * `checks.active.healthy.successes`: number of successes to consider a target healthy
