@@ -67,10 +67,10 @@ GET /t
 false
 --- error_log
 checking unhealthy targets: nothing to do
-unhealthy HTTP increment (1/3) for '(127.0.0.1:2114)'
-unhealthy HTTP increment (2/3) for '(127.0.0.1:2114)'
-unhealthy HTTP increment (3/3) for '(127.0.0.1:2114)'
-event: target status '(127.0.0.1:2114)' from 'true' to 'false'
+unhealthy HTTP increment (1/3) for '127.0.0.1(127.0.0.1:2114)'
+unhealthy HTTP increment (2/3) for '127.0.0.1(127.0.0.1:2114)'
+unhealthy HTTP increment (3/3) for '127.0.0.1(127.0.0.1:2114)'
+event: target status '127.0.0.1(127.0.0.1:2114)' from 'true' to 'false'
 checking healthy targets: nothing to do
 
 
@@ -123,10 +123,10 @@ GET /t
 true
 --- error_log
 checking healthy targets: nothing to do
-healthy SUCCESS increment (1/3) for '(127.0.0.1:2114)'
-healthy SUCCESS increment (2/3) for '(127.0.0.1:2114)'
-healthy SUCCESS increment (3/3) for '(127.0.0.1:2114)'
-event: target status '(127.0.0.1:2114)' from 'false' to 'true'
+healthy SUCCESS increment (1/3) for '127.0.0.1(127.0.0.1:2114)'
+healthy SUCCESS increment (2/3) for '127.0.0.1(127.0.0.1:2114)'
+healthy SUCCESS increment (3/3) for '127.0.0.1(127.0.0.1:2114)'
+event: target status '127.0.0.1(127.0.0.1:2114)' from 'false' to 'true'
 checking unhealthy targets: nothing to do
 
 === TEST 3: active probes, custom http status (regression test for pre-filled defaults)
@@ -179,10 +179,10 @@ true
 checking unhealthy targets: nothing to do
 --- no_error_log
 checking healthy targets: nothing to do
-unhealthy HTTP increment (1/3) for '(127.0.0.1:2114)'
-unhealthy HTTP increment (2/3) for '(127.0.0.1:2114)'
-unhealthy HTTP increment (3/3) for '(127.0.0.1:2114)'
-event: target status '(127.0.0.1:2114)' from 'true' to 'false'
+unhealthy HTTP increment (1/3) for '127.0.0.1(127.0.0.1:2114)'
+unhealthy HTTP increment (2/3) for '127.0.0.1(127.0.0.1:2114)'
+unhealthy HTTP increment (3/3) for '127.0.0.1(127.0.0.1:2114)'
+event: target status '127.0.0.1(127.0.0.1:2114)' from 'true' to 'false'
 
 
 === TEST 4: active probes, custom http status, node failing
@@ -234,10 +234,10 @@ GET /t
 false
 --- error_log
 checking unhealthy targets: nothing to do
-unhealthy HTTP increment (1/3) for '(127.0.0.1:2114)'
-unhealthy HTTP increment (2/3) for '(127.0.0.1:2114)'
-unhealthy HTTP increment (3/3) for '(127.0.0.1:2114)'
-event: target status '(127.0.0.1:2114)' from 'true' to 'false'
+unhealthy HTTP increment (1/3) for '127.0.0.1(127.0.0.1:2114)'
+unhealthy HTTP increment (2/3) for '127.0.0.1(127.0.0.1:2114)'
+unhealthy HTTP increment (3/3) for '127.0.0.1(127.0.0.1:2114)'
+event: target status '127.0.0.1(127.0.0.1:2114)' from 'true' to 'false'
 checking healthy targets: nothing to do
 
 
@@ -340,10 +340,10 @@ GET /t
 false
 --- error_log
 checking unhealthy targets: nothing to do
-unhealthy TCP increment (1/3) for '(127.0.0.1:2114)'
-unhealthy TCP increment (2/3) for '(127.0.0.1:2114)'
-unhealthy TCP increment (3/3) for '(127.0.0.1:2114)'
-event: target status '(127.0.0.1:2114)' from 'true' to 'false'
+unhealthy TCP increment (1/3) for '127.0.0.1(127.0.0.1:2114)'
+unhealthy TCP increment (2/3) for '127.0.0.1(127.0.0.1:2114)'
+unhealthy TCP increment (3/3) for '127.0.0.1(127.0.0.1:2114)'
+event: target status '127.0.0.1(127.0.0.1:2114)' from 'true' to 'false'
 checking healthy targets: nothing to do
 
 
@@ -396,10 +396,10 @@ GET /t
 true
 --- error_log
 checking healthy targets: nothing to do
-healthy SUCCESS increment (1/3) for '(127.0.0.1:2114)'
-healthy SUCCESS increment (2/3) for '(127.0.0.1:2114)'
-healthy SUCCESS increment (3/3) for '(127.0.0.1:2114)'
-event: target status '(127.0.0.1:2114)' from 'false' to 'true'
+healthy SUCCESS increment (1/3) for '127.0.0.1(127.0.0.1:2114)'
+healthy SUCCESS increment (2/3) for '127.0.0.1(127.0.0.1:2114)'
+healthy SUCCESS increment (3/3) for '127.0.0.1(127.0.0.1:2114)'
+event: target status '127.0.0.1(127.0.0.1:2114)' from 'false' to 'true'
 checking unhealthy targets: nothing to do
 
 
