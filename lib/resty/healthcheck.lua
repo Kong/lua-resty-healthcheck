@@ -42,6 +42,46 @@ local ngx_worker_pid = ngx.worker.pid
 local ssl = require("ngx.ssl")
 local resty_timer = require "resty.timer"
 
+local new_tab
+local nkeys
+local is_array
+
+do
+  local pcall = pcall
+  local ok
+
+  ok, new_tab = pcall(require, "table.new")
+  if not ok then
+    new_tab = function () return {} end
+  end
+
+  -- OpenResty branch of LuaJIT New API
+  ok, nkeys = pcall(require, "table.nkeys")
+  if not ok then
+    nkeys = function (tab)
+      local count = 0
+      for _, v in pairs(tab) do
+        if v ~= nil then
+          count = count + 1
+        end
+      end
+      return count
+    end
+  end
+
+  ok, is_array = pcall(require, "table.isarray")
+  if not ok then
+    is_array = function(t)
+      for k in pairs(t) do
+          if type(k) ~= "number" or math.floor(k) ~= k then
+            return false
+          end
+      end
+      return true
+    end
+  end
+end
+
 -- constants
 local EVENT_SOURCE_PREFIX = "lua-resty-healthcheck"
 local LOG_PREFIX = "[healthcheck] "
@@ -867,9 +907,36 @@ function checker:run_single_check(ip, port, hostname, hostheader)
   end
 
   local req_headers = self.checks.active.headers
-  local headers = table.concat(req_headers, "\r\n")
-  if #headers > 0 then
-    headers = headers .. "\r\n"
+  local headers
+  if self.checks.active._headers_str then
+    headers = self.checks.active._headers_str
+  else
+    local headers_length = nkeys(req_headers)
+    if headers_length > 0 then
+      if is_array(req_headers) then
+        self:log(WARN, "array headers is deprecated")
+        headers = table.concat(req_headers, "\r\n")
+      else
+        headers = new_tab(0, headers_length)
+        local idx = 0
+        for key, values in pairs(req_headers) do
+            if type(values) == "table" then
+              for _, value in ipairs(values) do
+                idx = idx + 1
+                headers[idx] = key .. ": " .. tostring(value)
+              end
+            else
+              idx = idx + 1
+              headers[idx] = key .. ": " .. tostring(values)
+            end
+        end
+        headers = table.concat(headers, "\r\n")
+      end
+      if #headers > 0 then
+        headers = headers .. "\r\n"
+      end
+    end
+    self.checks.active._headers_str = headers or ""
   end
 
   local path = self.checks.active.http_path
@@ -1308,7 +1375,7 @@ end
 -- * `checks.active.concurrency`: number of targets to check concurrently
 -- * `checks.active.http_path`: path to use in `GET` HTTP request to run on active checks
 -- * `checks.active.https_verify_certificate`: boolean indicating whether to verify the HTTPS certificate
--- * `checks.active.hheaders`: an array of headers (no hash-table! must be pre-formatted)
+-- * `checks.active.headers`: one or more lists of values indexed by header name
 -- * `checks.active.healthy.interval`: interval between checks for healthy targets (in seconds)
 -- * `checks.active.healthy.http_statuses`: which HTTP statuses to consider a success
 -- * `checks.active.healthy.successes`: number of successes to consider a target healthy
