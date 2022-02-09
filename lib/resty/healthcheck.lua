@@ -31,6 +31,7 @@ local ngx_log = ngx.log
 local tostring = tostring
 local ipairs = ipairs
 local cjson = require("cjson.safe").new()
+local table_insert = table.insert
 local table_remove = table.remove
 local worker_events = require("resty.worker.events")
 local resty_lock = require ("resty.lock")
@@ -321,6 +322,7 @@ end
 function checker:add_target(ip, port, hostname, is_healthy, hostheader)
   ip = tostring(assert(ip, "no ip address provided"))
   port = assert(tonumber(port), "no port number provided")
+  hostname = hostname or ip
   if is_healthy == nil then
     is_healthy = true
   end
@@ -328,13 +330,21 @@ function checker:add_target(ip, port, hostname, is_healthy, hostheader)
   local internal_health = is_healthy and "healthy" or "unhealthy"
 
   local ok, err = locking_target_list(self, function(target_list)
+  local found = false
 
     -- check whether we already have this target
     for _, target in ipairs(target_list) do
-      if target.ip == ip and target.port == port and target.hostname == hostname then
-        self:log(DEBUG, "adding an existing target: ", hostname or "", " ", ip,
-                ":", port, " (ignoring)")
-        return false
+      if target.ip == ip and target.port == port and target.hostname == (hostname) then
+        if target.purge_time == nil then
+          self:log(DEBUG, "adding an existing target: ", hostname or "", " ", ip,
+                  ":", port, " (ignoring)")
+          return
+        end
+        target.purge_time = nil
+        found = true
+        internal_health = self:get_target_status(ip, port, hostname) and
+                          "healthy" or "unhealthy"
+        break
       end
     end
 
@@ -348,12 +358,14 @@ function checker:add_target(ip, port, hostname, is_healthy, hostheader)
     end
 
     -- target does not exist, go add it
-    target_list[#target_list + 1] = {
-      ip = ip,
-      port = port,
-      hostname = hostname,
-      hostheader = hostheader,
-    }
+    if not found then
+      target_list[#target_list + 1] = {
+        ip = ip,
+        port = port,
+        hostname = hostname,
+        hostheader = hostheader,
+      }
+    end
     target_list = serialize(target_list)
 
     ok, err = self.shm:set(self.TARGET_LIST, target_list)
@@ -467,6 +479,28 @@ function checker:clear()
 
     -- raise event for our removed target
     self:raise_event(self.events.clear)
+
+    return true
+  end)
+end
+
+
+function checker:delayed_clear(delay)
+  assert(tonumber(delay), "no delay provided")
+
+  return locking_target_list(self, function(target_list)
+    local purge_time = ngx_now() + delay
+
+    -- add purge time to all targets
+    for _, target in ipairs(target_list) do
+      target.purge_time = purge_time
+    end
+
+    target_list = serialize(target_list)
+    local ok, err = self.shm:set(self.TARGET_LIST, target_list)
+    if not ok then
+      return nil, "failed to store target_list in shm: " .. err
+    end
 
     return true
   end)
@@ -1145,7 +1179,7 @@ function checker:event_handler(event_name, ip, port, hostname)
         end
       end
       self:log(DEBUG, "event: target '", hostname or "", " (", ip, ":", port,
-                      "' removed")
+                      ")' removed")
 
     else
       self:log(WARN, "event: trying to remove an unknown target '",
@@ -1159,10 +1193,10 @@ function checker:event_handler(event_name, ip, port, hostname)
          then
     if not target_found then
       -- it is a new target, must add it first
-      target_found = { ip = ip, port = port, hostname = hostname }
+      target_found = { ip = ip, port = port, hostname = hostname or ip }
       self.targets[target_found.ip] = self.targets[target_found.ip] or {}
       self.targets[target_found.ip][target_found.port] = self.targets[target_found.ip][target_found.port] or {}
-      self.targets[target_found.ip][target_found.port][target_found.hostname or ip] = target_found
+      self.targets[target_found.ip][target_found.port][target_found.hostname] = target_found
       self.targets[#self.targets + 1] = target_found
       self:log(DEBUG, "event: target added '", hostname or "", "(", ip, ":", port, ")'")
     end
@@ -1527,9 +1561,8 @@ function _M.new(opts)
     return nil, err
   end
 
-  -- if active checker is needed and not running, start it
-  if (self.checks.active.healthy.active or self.checks.active.unhealthy.active)
-    and active_check_timer == nil then
+  -- if active checker is not running, start it
+  if active_check_timer == nil then
 
     self:log(DEBUG, "worker ", ngx_worker_id(), " (pid: ", ngx_worker_pid(), ") ",
       "starting active check timer")
@@ -1551,6 +1584,35 @@ function _M.new(opts)
 
         local cur_time = ngx_now()
         for _, checker_obj in ipairs(hcs) do
+          -- clear targets marked for delayed removal
+          locking_target_list(checker_obj, function(target_list)
+            local removed_targets = {}
+            local index = 1
+            while index <= #target_list do
+              local target = target_list[index]
+              if target.purge_time and target.purge_time <= cur_time then
+                table_insert(removed_targets, target)
+                table_remove(target_list, index)
+              else
+                index = index + 1
+              end
+            end
+
+            if #removed_targets > 0 then
+              target_list = serialize(target_list)
+
+              local ok, err = shm:set(checker_obj.TARGET_LIST, target_list)
+              if not ok then
+                return nil, "failed to store target_list in shm: " .. err
+              end
+
+              for _, target in ipairs(removed_targets) do
+                clear_target_data_from_shm(checker_obj, target.ip, target.port, target.hostname)
+                checker_obj:raise_event(checker_obj.events.remove, target.ip, target.port, target.hostname)
+              end
+            end
+          end)
+
           if checker_obj.checks.active.healthy.active and
             (checker_obj.checks.active.healthy.last_run +
               checker_obj.checks.active.healthy.interval <= cur_time)
