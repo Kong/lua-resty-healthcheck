@@ -88,6 +88,15 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.5.0 (09-Feb-2022)
+
+* New option `checks.active.headers` supports one or more lists of values indexed by
+  header name. [#87](https://github.com/Kong/lua-resty-healthcheck/pull/87)
+* Introduce dealyed_clear() function, used to remove addresses after a time interval.
+  This function may be used when an address is being removed but may be added again
+  before the interval expires, keeping its health status.
+  [#88](https://github.com/Kong/lua-resty-healthcheck/pull/88)
+
 ### 1.4.2 (29-Jun-2021)
 
 * Fix: prevent new active checks being scheduled while a health check is running.
