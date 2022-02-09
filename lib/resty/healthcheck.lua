@@ -485,6 +485,10 @@ function checker:clear()
 end
 
 
+--- Clear all healthcheck data after a period of time.
+-- Useful for keeping target status between configuration reloads.
+-- @param delay delay in seconds before purging target state.
+-- @return `true` on success, or `nil + error` on failure.
 function checker:delayed_clear(delay)
   assert(tonumber(delay), "no delay provided")
 
