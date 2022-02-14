@@ -32,6 +32,8 @@ local tostring = tostring
 local ipairs = ipairs
 local cjson = require("cjson.safe").new()
 local table_remove = table.remove
+local table_concat = table.concat
+local string_format = string.format
 local resty_timer = require("resty.timer")
 local worker_events = require("resty.worker.events")
 local resty_lock = require ("resty.lock")
@@ -194,7 +196,7 @@ local ngx_timer_at do
     for _, args in ipairs(list) do
       local ok, err = pcall(args[1], ngx_worker_exiting(), unpack(args, 2, args.n))
       if not ok then
-        ngx.log(ngx.ERR, "timer failure: ", err)
+        ngx_log(ERR, "timer failure: ", err)
       end
     end
   end
@@ -237,7 +239,7 @@ end
 
 
 local function key_for(key_prefix, ip, port, hostname)
-  return string.format("%s:%s:%s%s", key_prefix, ip, port, hostname and ":" .. hostname or "")
+  return string_format("%s:%s:%s%s", key_prefix, ip, port, hostname and ":" .. hostname or "")
 end
 
 
@@ -840,7 +842,7 @@ function checker:set_all_target_statuses_for_hostname(hostname, port, is_healthy
     end
   end
 
-  return all_ok, #errs > 0 and table.concat(errs, "; ") or nil
+  return all_ok, #errs > 0 and table_concat(errs, "; ") or nil
 end
 
 
@@ -967,7 +969,7 @@ function checker:run_single_check(ip, port, hostname, hostheader)
     if headers_length > 0 then
       if is_array(req_headers) then
         self:log(WARN, "array headers is deprecated")
-        headers = table.concat(req_headers, "\r\n")
+        headers = table_concat(req_headers, "\r\n")
       else
         headers = new_tab(0, headers_length)
         local idx = 0
@@ -982,7 +984,7 @@ function checker:run_single_check(ip, port, hostname, hostheader)
               headers[idx] = key .. ": " .. tostring(values)
             end
         end
-        headers = table.concat(headers, "\r\n")
+        headers = table_concat(headers, "\r\n")
       end
       if #headers > 0 then
         headers = headers .. "\r\n"
@@ -1284,7 +1286,7 @@ local MAXNUM = 2^31 - 1
 
 local function fail(ctx, k, msg)
   ctx[#ctx + 1] = k
-  error(table.concat(ctx, ".") .. ": " .. msg, #ctx + 1)
+  error(table_concat(ctx, ".") .. ": " .. msg, #ctx + 1)
 end
 
 
