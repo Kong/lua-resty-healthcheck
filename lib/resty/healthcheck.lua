@@ -1487,9 +1487,13 @@ function _M.new(opts)
       self:log(DEBUG, "Got initial target list (", #self.targets, " targets)")
 
       -- load individual statuses
+      local duration = self.checks.passive.unhealthy.duration
       for _, target in ipairs(self.targets) do
         local state_key = key_for(self.TARGET_STATE, target.ip, target.port, target.hostname)
         target.internal_health = INTERNAL_STATES[self.shm:get(state_key)]
+        if duration > 0 and (target.internal_health == "unhealthy" or target.internal_health == "mostly_unhealthy") then
+          target.unhealthy_expire = ngx_now() - duration
+        end
         self:log(DEBUG, "Got initial status ", target.internal_health, " ",
                         target.hostname, " ", target.ip, ":", target.port)
         -- fill-in the hash part for easy lookup
