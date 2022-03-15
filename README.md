@@ -140,6 +140,34 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 * fix: do not call on the module table, but use a method for locks. Also in
   [#57](https://github.com/Kong/lua-resty-healthcheck/pull/57)
 
+### 1.5.0 (09-Feb-2022)
+
+* New option `checks.active.headers` supports one or more lists of values indexed by
+  header name. [#87](https://github.com/Kong/lua-resty-healthcheck/pull/87)
+* Introduce dealyed_clear() function, used to remove addresses after a time interval.
+  This function may be used when an address is being removed but may be added again
+  before the interval expires, keeping its health status.
+  [#88](https://github.com/Kong/lua-resty-healthcheck/pull/88)
+
+### 1.4.2 (29-Jun-2021)
+
+* Fix: prevent new active checks being scheduled while a health check is running.
+  [#72](https://github.com/Kong/lua-resty-healthcheck/pull/72)
+* Fix: remove event watcher when stopping an active health check.
+  [#74](https://github.com/Kong/lua-resty-healthcheck/pull/74); fixes Kong issue
+  [#7406](https://github.com/Kong/kong/issues/7406)
+
+### 1.4.1 (17-Feb-2021)
+
+* Fix: make sure that a single worker will actively check hosts' statuses.
+  [#67](https://github.com/Kong/lua-resty-healthcheck/pull/67)
+
+### 1.4.0 (07-Jan-2021)
+
+* Use a single timer to actively health check targets. This reduces the number
+  of timers used by health checkers, as they used to use two timers by each
+  target. [#62](https://github.com/Kong/lua-resty-healthcheck/pull/62)
+
 ### 1.3.0 (17-Jun-2020)
 
 * Adds support to mTLS to active healthchecks. This feature  can be used adding
