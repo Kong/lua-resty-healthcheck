@@ -88,6 +88,11 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.5.1 (23-Mar-2022)
+
+* Fix: avoid breaking active health checks when adding or removing targets.
+  [#93](https://github.com/Kong/lua-resty-healthcheck/pull/93)
+
 ### 1.5.0 (09-Feb-2022)
 
 * New option `checks.active.headers` supports one or more lists of values indexed by
