@@ -1,6 +1,10 @@
 # lua-resty-healthcheck
 
-[![Build Status][badge-travis-image]][badge-travis-url]
+![latest version](https://img.shields.io/github/v/tag/Kong/lua-resty-healthcheck?sort=semver)
+![latest luarocks version](https://img.shields.io/luarocks/v/kong/lua-resty-healthcheck?style=flat-square)
+![master branch](https://github.com/Kong/lua-resty-healthcheck/actions/workflows/latest_os.yml/badge.svg)
+![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square)
+![Twitter Follow](https://img.shields.io/twitter/follow/thekonginc?style=social)
 
 A health check library for OpenResty.
 
