@@ -942,16 +942,16 @@ function checker:run_single_check(ip, port, hostname, hostheader)
     local https_sni, session, err
     https_sni = self.checks.active.https_sni or hostheader or hostname
     if self.ssl_cert and self.ssl_key then
-      session, err = sock:tlshandshake({
-        verify = self.checks.active.https_verify_certificate,
-        client_cert = self.ssl_cert,
-        client_priv_key = self.ssl_key,
-        server_name = https_sni
-      })
-    else
-      session, err = sock:sslhandshake(nil, https_sni,
-                                     self.checks.active.https_verify_certificate)
+      ok, err = sock:setclientcert(self.ssl_cert, self.ssl_key)
+
+      if not ok then
+        self:log(ERR, "failed to set client certificate: ", err)
+      end
     end
+
+    session, err = sock:sslhandshake(nil, https_sni,
+                                     self.checks.active.https_verify_certificate)
+
     if not session then
       sock:close()
       self:log(ERR, "failed SSL handshake with '", hostname or "", " (", ip, ":", port, ")', using server name (sni) '", https_sni, "': ", err)
