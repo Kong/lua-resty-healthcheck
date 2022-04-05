@@ -105,6 +105,11 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
   before the interval expires, keeping its health status.
   [#88](https://github.com/Kong/lua-resty-healthcheck/pull/88)
 
+### 1.4.3 (31-Mar-2022)
+
+* Fix: avoid breaking active health checks when adding or removing targets.
+  [#100](https://github.com/Kong/lua-resty-healthcheck/pull/100)
+
 ### 1.4.2 (29-Jun-2021)
 
 * Fix: prevent new active checks being scheduled while a health check is running.
@@ -212,7 +217,7 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 ## Copyright and License
 
 ```
-Copyright 2017-2021 Kong Inc.
+Copyright 2017-2022 Kong Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
