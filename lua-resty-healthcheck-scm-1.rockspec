@@ -14,7 +14,6 @@ description = {
   homepage = "https://github.com/Kong/lua-resty-healthcheck"
 }
 dependencies = {
-  "lua-resty-worker-events == 1.0.0",
   "penlight >= 1.9.2",
   "lua-resty-timer ~> 1",
 }
