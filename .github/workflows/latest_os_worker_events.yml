@@ -1,14 +1,14 @@
-name: Build and test for Ubuntu 18.04
+name: Build and test for Ubuntu latest using lua-resty-worker-events
 
 on: [push, pull_request]
 
 jobs:
   build:
     name: Build and install dependencies
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        openresty-version: [1.13.6.2, 1.15.8.3, 1.17.8.2, 1.19.9.1, 1.21.4.1]
+        openresty-version: [1.21.4.1]
         luarocks-version: [3.8.0]
 
     steps:
@@ -42,7 +42,7 @@ jobs:
           path: |
             ${{ env.INSTALL_PATH }}
             ~/perl5
-          key: ${{ runner.os }}-${{ matrix.openresty-version }}-${{ hashFiles('.github/workflows/old_os.yml') }}
+          key: ${{ runner.os }}-${{ hashFiles('.github/workflows/latest_os.yml') }}
 
       - name: Create needed paths
         if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -84,6 +84,7 @@ jobs:
             make install
             popd
             luarocks install luacheck
+            luarocks install lua-resty-worker-events 1.0.0
             popd
           fi
 
@@ -100,11 +101,11 @@ jobs:
 
   lint:
     name: Static code analysis
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     needs: build
     strategy:
       matrix:
-        openresty-version: [1.13.6.2, 1.15.8.3, 1.17.8.2, 1.19.9.1, 1.21.4.1]
+        openresty-version: [1.21.4.1]
         luarocks-version: [3.8.0]
     steps:
       - name: Checkout lua-resty-healthcheck
@@ -134,7 +135,7 @@ jobs:
           path: |
             ${{ env.INSTALL_PATH }}
             ~/perl5
-          key: ${{ runner.os }}-${{ matrix.openresty-version }}-${{ hashFiles('.github/workflows/old_os.yml') }}
+          key: ${{ runner.os }}-${{ hashFiles('.github/workflows/latest_os.yml') }}
 
       - name: Lint code
         run: |
@@ -143,11 +144,11 @@ jobs:
 
   install-and-test:
     name: Test lua-resty-healthcheck
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     needs: build
     strategy:
       matrix:
-        openresty-version: [1.13.6.2, 1.15.8.3, 1.17.8.2, 1.19.9.1, 1.21.4.1]
+        openresty-version: [1.21.4.1]
         luarocks-version: [3.8.0]
     steps:
       - name: Checkout lua-resty-healthcheck
@@ -177,7 +178,7 @@ jobs:
           path: |
             ${{ env.INSTALL_PATH }}
             ~/perl5
-          key: ${{ runner.os }}-${{ matrix.openresty-version }}-${{ hashFiles('.github/workflows/old_os.yml') }}
+          key: ${{ runner.os }}-${{ hashFiles('.github/workflows/latest_os.yml') }}
 
       - name: Install lua-resty-healthcheck
         run: luarocks make
