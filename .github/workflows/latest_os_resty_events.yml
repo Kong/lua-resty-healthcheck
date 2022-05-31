@@ -1,4 +1,4 @@
-name: Build and test for Ubuntu latest
+name: Build and test for Ubuntu latest using lua-resty-events
 
 on: [push, pull_request]
 
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        openresty-version: [1.19.9.1]
+        openresty-version: [1.21.4.1]
         luarocks-version: [3.8.0]
 
     steps:
@@ -84,6 +84,7 @@ jobs:
             make install
             popd
             luarocks install luacheck
+            luarocks install lua-resty-events 0.1.0
             popd
           fi
 
@@ -104,7 +105,7 @@ jobs:
     needs: build
     strategy:
       matrix:
-        openresty-version: [1.19.9.1]
+        openresty-version: [1.21.4.1]
         luarocks-version: [3.8.0]
     steps:
       - name: Checkout lua-resty-healthcheck
@@ -147,7 +148,7 @@ jobs:
     needs: build
     strategy:
       matrix:
-        openresty-version: [1.19.9.1]
+        openresty-version: [1.21.4.1]
         luarocks-version: [3.8.0]
     steps:
       - name: Checkout lua-resty-healthcheck
