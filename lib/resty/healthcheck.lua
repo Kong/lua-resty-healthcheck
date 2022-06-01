@@ -1468,7 +1468,7 @@ end
 -- @return checker object, or `nil + error`
 function _M.new(opts)
 
-  load_events_module(opts.events_module)
+  load_events_module((opts or EMPTY).events_module)
 
   local active_type = (((opts or EMPTY).checks or EMPTY).active or EMPTY).type
   local passive_type = (((opts or EMPTY).checks or EMPTY).passive or EMPTY).type
