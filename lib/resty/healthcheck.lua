@@ -92,7 +92,7 @@ local worker_events
 --- This function loads the worker events module received as arg. It will throw
 -- error() if it is not possible to load the module.
 local function load_events_module(module_name)
-  if module_name == "resty.worker.events" then
+  if module_name == nil or module_name == "resty.worker.events" then
     worker_events = require("resty.worker.events")
     assert(worker_events, "could not load lua-resty-worker-events")
     assert(worker_events._VERSION == RESTY_WORKER_EVENTS_VER,
