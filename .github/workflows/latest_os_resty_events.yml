@@ -83,10 +83,14 @@ jobs:
             make build
             make install
             popd
-            luarocks install luacheck
-            luarocks install lua-resty-events 0.1.0
             popd
           fi
+
+      - name: Install manual dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          luarocks install luacheck
+          luarocks install lua-resty-events 0.1.0
 
       - name: Install Test::NGINX
         if: steps.cache-deps.outputs.cache-hit != 'true'
