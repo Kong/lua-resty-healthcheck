@@ -1,15 +1,15 @@
-name: Build and test for Ubuntu latest using lua-resty-events
+name: Build and test using lua-resty-events
 
 on: [push, pull_request]
 
 jobs:
   build:
     name: Build and install dependencies
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     strategy:
       matrix:
-        openresty-version: [1.21.4.1]
-        luarocks-version: [3.8.0]
+        openresty-version: [1.15.8.3, 1.17.8.2, 1.19.9.1, 1.21.4.1]
+        luarocks-version: [3.9.0]
 
     steps:
       - name: Update and install OS dependencies
@@ -42,7 +42,7 @@ jobs:
           path: |
             ${{ env.INSTALL_PATH }}
             ~/perl5
-          key: ${{ runner.os }}-${{ hashFiles('.github/workflows/latest_os.yml') }}
+          key: ${{ runner.os }}-${{ hashFiles('.github/workflows/build_and_test_with_resty_events.yml') }}
 
       - name: Create needed paths
         if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -105,12 +105,12 @@ jobs:
 
   lint:
     name: Static code analysis
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     needs: build
     strategy:
       matrix:
-        openresty-version: [1.21.4.1]
-        luarocks-version: [3.8.0]
+        openresty-version: [1.15.8.3, 1.17.8.2, 1.19.9.1, 1.21.4.1]
+        luarocks-version: [3.9.0]
     steps:
       - name: Checkout lua-resty-healthcheck
         uses: actions/checkout@v2
@@ -139,7 +139,7 @@ jobs:
           path: |
             ${{ env.INSTALL_PATH }}
             ~/perl5
-          key: ${{ runner.os }}-${{ hashFiles('.github/workflows/latest_os.yml') }}
+          key: ${{ runner.os }}-${{ hashFiles('.github/workflows/build_and_test_with_resty_events.yml') }}
 
       - name: Lint code
         run: |
@@ -148,12 +148,12 @@ jobs:
 
   install-and-test:
     name: Test lua-resty-healthcheck
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     needs: build
     strategy:
       matrix:
-        openresty-version: [1.21.4.1]
-        luarocks-version: [3.8.0]
+        openresty-version: [1.15.8.3, 1.17.8.2, 1.19.9.1, 1.21.4.1]
+        luarocks-version: [3.9.0]
     steps:
       - name: Checkout lua-resty-healthcheck
         uses: actions/checkout@v2
@@ -182,7 +182,7 @@ jobs:
           path: |
             ${{ env.INSTALL_PATH }}
             ~/perl5
-          key: ${{ runner.os }}-${{ hashFiles('.github/workflows/latest_os.yml') }}
+          key: ${{ runner.os }}-${{ hashFiles('.github/workflows/build_and_test_with_resty_events.yml') }}
 
       - name: Install lua-resty-healthcheck
         run: luarocks make
