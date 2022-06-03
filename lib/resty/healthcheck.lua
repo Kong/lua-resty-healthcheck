@@ -28,6 +28,7 @@ local ERR = ngx.ERR
 local WARN = ngx.WARN
 local DEBUG = ngx.DEBUG
 local ngx_log = ngx.log
+local ngx_now = ngx.now
 local tostring = tostring
 local ipairs = ipairs
 local cjson = require("cjson.safe").new()
@@ -515,14 +516,18 @@ end
 -- @param hostname the hostname of the target being checked.
 -- @return `true` if healthy, `false` if unhealthy, or `nil + error` on failure.
 function checker:get_target_status(ip, port, hostname)
-
   local target = get_target(self, ip, port, hostname)
   if not target then
     return nil, "target not found"
   end
-  return target.internal_health == "healthy"
-      or target.internal_health == "mostly_healthy"
 
+  local ok = target.internal_health == "healthy"
+              or target.internal_health == "mostly_healthy"
+  if not ok and target.unhealthy_expire and target.unhealthy_expire < ngx_now() then
+    self:report_success(ip, port, hostname)
+    ok = true
+  end
+  return ok
 end
 
 
@@ -639,7 +644,11 @@ local function incr_counter(self, health_report, ip, port, hostname, limit, ctr_
 
   return locking_target(self, ip, port, hostname, function()
     local counter_key = key_for(self.TARGET_COUNTER, ip, port, hostname)
-    local multictr, err = self.shm:incr(counter_key, ctr_type, 0)
+    local duration = 0
+    if ctr_type ~= CTR_SUCCESS then
+      duration = self.checks.passive.unhealthy.duration
+    end
+    local multictr, err = self.shm:incr(counter_key, ctr_type, 0, duration)
     if err then
       return nil, err
     end
@@ -1187,6 +1196,15 @@ function checker:event_handler(event_name, ip, port, hostname)
       self:log(DEBUG, "event: target status '", hostname or "", "(", ip, ":",
                port, ")' from '", from, "' to '", to, "', ver: ", self.status_ver)
     end
+
+    local duration = self.checks.passive.unhealthy.duration
+    if duration > 0
+      and (event_name == self.events.unhealthy or event_name == self.events.mostly_unhealthy)
+      and target_found.internal_health ~= event_name then
+
+      target_found.unhealthy_expire = ngx_now() + duration
+      self:log(DEBUG, "set target_found.unhealthy_expire = ", target_found.unhealthy_expire)
+    end
     target_found.internal_health = event_name
 
   elseif event_name == self.events.clear then
@@ -1367,6 +1385,7 @@ local defaults = {
         tcp_failures = 2,
         timeouts = 7,
         http_failures = 5,
+        duration = 0,
       },
     },
   },
@@ -1537,9 +1556,13 @@ function _M.new(opts)
       self:log(DEBUG, "Got initial target list (", #self.targets, " targets)")
 
       -- load individual statuses
+      local duration = self.checks.passive.unhealthy.duration
       for _, target in ipairs(self.targets) do
         local state_key = key_for(self.TARGET_STATE, target.ip, target.port, target.hostname)
         target.internal_health = INTERNAL_STATES[self.shm:get(state_key)]
+        if duration > 0 and (target.internal_health == "unhealthy" or target.internal_health == "mostly_unhealthy") then
+          target.unhealthy_expire = ngx_now() - duration
+        end
         self:log(DEBUG, "Got initial status ", target.internal_health, " ",
                         target.hostname, " ", target.ip, ":", target.port)
         -- fill-in the hash part for easy lookup
