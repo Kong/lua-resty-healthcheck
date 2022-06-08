@@ -1,4 +1,4 @@
-name: Build and test using lua-resty-worker-events
+name: Build and test
 
 on: [push, pull_request]
 
@@ -24,18 +24,12 @@ jobs:
         run: |
           echo "/usr/local/openresty/nginx/sbin" >> $GITHUB_PATH
 
-      - name: Lookup build cache
-        uses: actions/cache@v2
-        id: cache-deps
-        with:
-          path: |
-            ~/perl5
-          key: ${{ runner.os }}-${{ hashFiles('.github/workflows/build_and_test_with_worker_events.yml') }}
+      - name: Checkout lua-resty-healthcheck
+        uses: actions/checkout@v3
 
       - name: Install OpenResty ${{ matrix.openresty-version }}
         env:
           OPENRESTY_VER: ${{ matrix.openresty-version }}
-        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: |
           sudo apt-get -y install --no-install-recommends wget gnupg ca-certificates
           wget -O - https://openresty.org/package/pubkey.gpg | sudo apt-key add -
@@ -44,24 +38,21 @@ jobs:
           sudo apt-get -y install openresty=$OPENRESTY_VER-1~focal1
 
       - name: Install LuaRocks
-        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: sudo apt-get install -y luarocks
 
       - name: Install manual dependencies
-        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: |
           sudo luarocks install luacheck
           sudo luarocks install lua-resty-worker-events 1.0.0
 
       - name: Install Test::NGINX
-        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: |
           sudo apt-get install cpanminus
           cpanm --notest --local-lib=$HOME/perl5 local::lib && eval $(perl -I $HOME/perl5/lib/perl5/ -Mlocal::lib)
           cpanm --notest Test::Nginx
 
       - name: Checkout lua-resty-healthcheck
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install lua-resty-healthcheck
         run: sudo luarocks make
