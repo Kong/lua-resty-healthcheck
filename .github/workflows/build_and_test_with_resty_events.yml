@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        openresty-version: [1.15.8.3]
+        openresty-version: [1.15.8.3, 1.17.8.2, 1.19.9.1, 1.21.4.1]
 
     steps:
       - name: Update and install OS dependencies
@@ -121,7 +121,7 @@ jobs:
         if: steps.cache-deps.outputs.cache-hit != 'true'
         run: |
           cd lua-resty-events
-          OPENRESTY_PREFIX=$INSTALL_ROOT/openresty PREFIX=$INSTALL_ROOT make install
+          OPENRESTY_PREFIX=$INSTALL_ROOT PREFIX=$INSTALL_ROOT LUA_LIB_DIR=$INSTALL_ROOT/lualib make install
 
       - name: Install lua-resty-healthcheck
         run: luarocks make
@@ -133,4 +133,4 @@ jobs:
         run: |
           eval `luarocks path`
           eval $(perl -I $HOME/perl5/lib/perl5/ -Mlocal::lib)
-          TEST_NGINX_RANDOMIZE=1 prove -I. -r t
+          TEST_NGINX_RANDOMIZE=1 prove -I. -r t/with_resty-events

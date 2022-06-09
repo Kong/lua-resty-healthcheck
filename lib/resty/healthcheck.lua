@@ -92,13 +92,13 @@ local worker_events
 --- This function loads the worker events module received as arg. It will throw
 -- error() if it is not possible to load the module.
 local function load_events_module(module_name)
-  if module_name == nil or module_name == "resty.worker.events" then
+  module_name = module_name or "resty.worker.events"
+
+  if module_name == "resty.worker.events" then
     worker_events = require("resty.worker.events")
     assert(worker_events, "could not load lua-resty-worker-events")
     assert(worker_events._VERSION == RESTY_WORKER_EVENTS_VER,
           "unsupported lua-resty-worker-events version")
-    assert(worker_events.configured(), "please configure the " ..
-          "'lua-resty-worker-events' module before using 'lua-resty-healthcheck'")
 
   elseif module_name == "resty.events" then
     worker_events = require("resty.events.compat")
@@ -110,6 +110,8 @@ local function load_events_module(module_name)
     error("unknown events module")
   end
 
+  assert(worker_events.configured(), "please configure the '" ..
+          module_name .. "' module before using 'lua-resty-healthcheck'")
 end
 
 

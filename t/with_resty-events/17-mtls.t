@@ -6,11 +6,22 @@ workers(1);
 plan tests => repeat_each() * 4;
 
 my $pwd = cwd();
+$ENV{TEST_NGINX_SERVROOT} = server_root();
 
 our $HttpConfig = qq{
     lua_package_path "$pwd/lib/?.lua;;";
     lua_shared_dict test_shm 8m;
-    lua_shared_dict my_worker_events 8m;
+
+    server {
+        server_name kong_worker_events;
+        listen unix:$ENV{TEST_NGINX_SERVROOT}/worker_events.sock;
+        access_log off;
+        location / {
+            content_by_lua_block {
+                require("resty.events.compat").run()
+            }
+        }
+    }
 };
 
 run_tests();
@@ -25,17 +36,18 @@ qq{
 --- config
     location = /t {
         content_by_lua_block {
-            local we = require "resty.worker.events"
-            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local we = require "resty.events.compat"
+            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
 
             local pl_file = require "pl.file"
-            local cert = pl_file.read("t/util/cert.pem", true)
-            local key = pl_file.read("t/util/key.pem", true)
+            local cert = pl_file.read("t/with_resty-events/util/cert.pem", true)
+            local key = pl_file.read("t/with_resty-events/util/key.pem", true)
 
             local healthcheck = require("resty.healthcheck")
             local checker = healthcheck.new({
                 name = "testing_mtls",
                 shm_name = "test_shm",
+events_module = "resty.events",
                 type = "http",
                 ssl_cert = cert,
                 ssl_key = key,
@@ -80,18 +92,19 @@ qq{
 --- config
     location = /t {
         content_by_lua_block {
-            local we = require "resty.worker.events"
-            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local we = require "resty.events.compat"
+            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
 
             local pl_file = require "pl.file"
             local ssl = require "ngx.ssl"
-            local cert = ssl.parse_pem_cert(pl_file.read("t/util/cert.pem", true))
-            local key = ssl.parse_pem_priv_key(pl_file.read("t/util/key.pem", true))
+            local cert = ssl.parse_pem_cert(pl_file.read("t/with_resty-events/util/cert.pem", true))
+            local key = ssl.parse_pem_priv_key(pl_file.read("t/with_resty-events/util/key.pem", true))
 
             local healthcheck = require("resty.healthcheck")
             local checker = healthcheck.new({
                 name = "testing_mtls",
                 shm_name = "test_shm",
+events_module = "resty.events",
                 type = "http",
                 ssl_cert = cert,
                 ssl_key = key,
