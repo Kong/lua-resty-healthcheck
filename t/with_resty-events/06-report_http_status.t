@@ -12,6 +12,16 @@ our $HttpConfig = qq{
     lua_package_path "$pwd/lib/?.lua;;";
     lua_shared_dict test_shm 8m;
 
+    init_worker_by_lua_block {
+        local we = require "resty.events.compat"
+        assert(we.configure({
+            unique_timeout = 5,
+            broker_id = 0,
+            listening = "unix:$ENV{TEST_NGINX_SERVROOT}/worker_events.sock"
+        }))
+        assert(we.configured())
+    }
+
     server {
         server_name kong_worker_events;
         listen unix:$ENV{TEST_NGINX_SERVROOT}/worker_events.sock;
@@ -45,8 +55,6 @@ qq{
 --- config
     location = /t {
         content_by_lua_block {
-            local we = require "resty.events.compat"
-            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
             local healthcheck = require("resty.healthcheck")
             local checker = healthcheck.new({
                 name = "testing",
@@ -77,15 +85,16 @@ events_module = "resty.events",
                     }
                 }
             })
-            ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
+            ngx.sleep(0.002)
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 500, "passive")
+            ngx.sleep(0.002)
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- false
         }
@@ -122,8 +131,6 @@ qq{
 --- config
     location = /t {
         content_by_lua_block {
-            local we = require "resty.events.compat"
-            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
             local healthcheck = require("resty.healthcheck")
             local checker = healthcheck.new({
                 name = "testing",
@@ -154,9 +161,9 @@ events_module = "resty.events",
                     }
                 }
             })
-            ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, false)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, false)
+            ngx.sleep(0.002)
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
@@ -165,6 +172,7 @@ events_module = "resty.events",
             checker:report_http_status("127.0.0.1", 2113, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 200, "passive")
+            ngx.sleep(0.002)
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- true
         }
@@ -202,8 +210,6 @@ qq{
 --- config
     location = /t {
         content_by_lua_block {
-            local we = require "resty.events.compat"
-            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
             local healthcheck = require("resty.healthcheck")
             local checker = healthcheck.new({
                 name = "testing",
@@ -234,12 +240,13 @@ events_module = "resty.events",
                     }
                 }
             })
-            ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, false)
+            ngx.sleep(0.002)
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "passive")
+            ngx.sleep(0.002)
             ngx.say(checker:get_target_status("127.0.0.1", 2119, nil))  -- false
         }
     }
@@ -267,8 +274,6 @@ qq{
 --- config
     location = /t {
         content_by_lua_block {
-            local we = require "resty.events.compat"
-            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
             local healthcheck = require("resty.healthcheck")
             local checker = healthcheck.new({
                 name = "testing",
@@ -299,12 +304,13 @@ events_module = "resty.events",
                     }
                 }
             })
-            ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, false)
+            ngx.sleep(0.002)
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
+            ngx.sleep(0.002)
             ngx.say(checker:get_target_status("127.0.0.1", 2119, nil))  -- false
         }
     }
@@ -332,8 +338,6 @@ qq{
 --- config
     location = /t {
         content_by_lua_block {
-            local we = require "resty.events.compat"
-            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
             local healthcheck = require("resty.healthcheck")
             local checker = healthcheck.new({
                 name = "testing",
@@ -364,12 +368,13 @@ events_module = "resty.events",
                     }
                 }
             })
-            ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
+            ngx.sleep(0.002)
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
+            ngx.sleep(0.002)
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- true
         }
     }
@@ -397,8 +402,6 @@ qq{
 --- config
     location = /t {
         content_by_lua_block {
-            local we = require "resty.events.compat"
-            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
             local healthcheck = require("resty.healthcheck")
             local checker = healthcheck.new({
                 name = "testing",
@@ -429,12 +432,13 @@ events_module = "resty.events",
                     }
                 }
             })
-            ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
+            ngx.sleep(0.002)
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
+            ngx.sleep(0.002)
             ngx.say(checker:get_target_status("127.0.0.1", 2119, nil))  -- true
         }
     }
@@ -458,8 +462,6 @@ qq{
             ngx.say("OK")
         }
         log_by_lua_block {
-            local we = require "resty.events.compat"
-            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
             local healthcheck = require("resty.healthcheck")
             local checker = healthcheck.new({
                 name = "testing",
@@ -479,11 +481,13 @@ events_module = "resty.events",
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
+            ngx.sleep(0.002)
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
+            ngx.sleep(0.002)
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
         }
     }
