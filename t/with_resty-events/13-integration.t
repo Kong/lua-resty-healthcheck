@@ -132,12 +132,14 @@ events_module = "resty.events",
             -- that implements the specified behavior.
             local function run_test_case(case)
                 assert(checker:set_target_status(host, port, nil, true))
+                ngx.sleep(0.002)
                 local i = 1
                 local s, f, t, o = 0, 0, 0, 0
                 local mode = true
                 for c in case:gmatch(".") do
                     if c == "S" then
                         checker:report_http_status(host, port, nil, 200, "passive")
+                        ngx.sleep(0.002)
                         s = s + 1
                         f, t, o = 0, 0, 0
                         if s == 2 then
@@ -145,6 +147,7 @@ events_module = "resty.events",
                         end
                     elseif c == "F" then
                         checker:report_http_status(host, port, nil, 500, "passive")
+                        ngx.sleep(0.002)
                         f = f + 1
                         s = 0
                         if f == 2 then
@@ -152,6 +155,7 @@ events_module = "resty.events",
                         end
                     elseif c == "T" then
                         checker:report_tcp_failure(host, port, nil, "read", "passive")
+                        ngx.sleep(0.002)
                         t = t + 1
                         s = 0
                         if t == 2 then
@@ -159,6 +163,7 @@ events_module = "resty.events",
                         end
                     elseif c == "O" then
                         checker:report_timeout(host, port, nil, "passive")
+                        ngx.sleep(0.002)
                         o = o + 1
                         s = 0
                         if o == 2 then
