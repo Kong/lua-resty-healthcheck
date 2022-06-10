@@ -82,12 +82,16 @@ qq{
                     }
                 }
             })
-            ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2115, nil, true)
+            ngx.sleep(0.002) -- wait for initial timers to run once
             ngx.say(checker:get_target_status("127.0.0.1", 2115))  -- true
+
             checker:report_tcp_failure("127.0.0.1", 2115)
+            ngx.sleep(0.002) -- wait for initial timers to run once
             ngx.say(checker:get_target_status("127.0.0.1", 2115))  -- false
+
             checker:report_success("127.0.0.1", 2115)
+            ngx.sleep(0.002) -- wait for initial timers to run once
             ngx.say(checker:get_target_status("127.0.0.1", 2115))  -- true
         }
     }
