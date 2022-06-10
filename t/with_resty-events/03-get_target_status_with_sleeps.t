@@ -12,6 +12,16 @@ our $HttpConfig = qq{
     lua_package_path "$pwd/lib/?.lua;;";
     lua_shared_dict test_shm 8m;
 
+    init_worker_by_lua_block {
+        local we = require "resty.events.compat"
+        assert(we.configure({
+            unique_timeout = 5,
+            broker_id = 0,
+            listening = "unix:$ENV{TEST_NGINX_SERVROOT}/worker_events.sock"
+        }))
+        assert(we.configured())
+    }
+
     server {
         server_name kong_worker_events;
         listen unix:$ENV{TEST_NGINX_SERVROOT}/worker_events.sock;
@@ -43,10 +53,6 @@ qq{
 --- config
     location = /t {
         content_by_lua_block {
-            ngx.sleep(0.1)
-
-            local we = require "resty.events.compat"
-            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
             local healthcheck = require("resty.healthcheck")
             local checker = healthcheck.new({
                 name = "testing",
