@@ -12,6 +12,16 @@ our $HttpConfig = qq{
     lua_package_path "$pwd/lib/?.lua;;";
     lua_shared_dict test_shm 8m;
 
+    init_worker_by_lua_block {
+        local we = require "resty.events.compat"
+        assert(we.configure({
+            unique_timeout = 5,
+            broker_id = 0,
+            listening = "unix:$ENV{TEST_NGINX_SERVROOT}/worker_events.sock"
+        }))
+        assert(we.configured())
+    }
+
     server {
         server_name kong_worker_events;
         listen unix:$ENV{TEST_NGINX_SERVROOT}/worker_events.sock;
@@ -42,8 +52,6 @@ qq{
             local host = "127.0.0.1"
             local port = 2112
 
-            local we = require "resty.events.compat"
-            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
             local healthcheck = require("resty.healthcheck")
             local checker = healthcheck.new({
                 test = true,
@@ -124,12 +132,14 @@ events_module = "resty.events",
             -- that implements the specified behavior.
             local function run_test_case(case)
                 assert(checker:set_target_status(host, port, nil, true))
+                ngx.sleep(0.002)
                 local i = 1
                 local s, f, t, o = 0, 0, 0, 0
                 local mode = true
                 for c in case:gmatch(".") do
                     if c == "S" then
                         checker:report_http_status(host, port, nil, 200, "passive")
+                        ngx.sleep(0.002)
                         s = s + 1
                         f, t, o = 0, 0, 0
                         if s == 2 then
@@ -137,6 +147,7 @@ events_module = "resty.events",
                         end
                     elseif c == "F" then
                         checker:report_http_status(host, port, nil, 500, "passive")
+                        ngx.sleep(0.002)
                         f = f + 1
                         s = 0
                         if f == 2 then
@@ -144,6 +155,7 @@ events_module = "resty.events",
                         end
                     elseif c == "T" then
                         checker:report_tcp_failure(host, port, nil, "read", "passive")
+                        ngx.sleep(0.002)
                         t = t + 1
                         s = 0
                         if t == 2 then
@@ -151,6 +163,7 @@ events_module = "resty.events",
                         end
                     elseif c == "O" then
                         checker:report_timeout(host, port, nil, "passive")
+                        ngx.sleep(0.002)
                         o = o + 1
                         s = 0
                         if o == 2 then

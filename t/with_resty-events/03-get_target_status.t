@@ -15,6 +15,8 @@ our $HttpConfig = qq{
     init_worker_by_lua_block {
         local we = require "resty.events.compat"
         assert(we.configure({
+            unique_timeout = 5,
+            broker_id = 0,
             listening = "unix:$ENV{TEST_NGINX_SERVROOT}/worker_events.sock"
         }))
         assert(we.configured())
@@ -80,12 +82,16 @@ qq{
                     }
                 }
             })
-            ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2115, nil, true)
+            ngx.sleep(0.002)
             ngx.say(checker:get_target_status("127.0.0.1", 2115))  -- true
+
             checker:report_tcp_failure("127.0.0.1", 2115)
+            ngx.sleep(0.002)
             ngx.say(checker:get_target_status("127.0.0.1", 2115))  -- false
+
             checker:report_success("127.0.0.1", 2115)
+            ngx.sleep(0.002)
             ngx.say(checker:get_target_status("127.0.0.1", 2115))  -- true
         }
     }

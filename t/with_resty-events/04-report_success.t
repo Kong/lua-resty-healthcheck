@@ -15,6 +15,8 @@ our $HttpConfig = qq{
     init_worker_by_lua_block {
         local we = require "resty.events.compat"
         assert(we.configure({
+            unique_timeout = 5,
+            broker_id = 0,
             listening = "unix:$ENV{TEST_NGINX_SERVROOT}/worker_events.sock"
         }))
         assert(we.configured())
@@ -83,15 +85,16 @@ events_module = "resty.events",
                     }
                 }
             })
-            ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2116, nil, false)
             local ok, err = checker:add_target("127.0.0.1", 2118, nil, false)
+            ngx.sleep(0.002)
             checker:report_success("127.0.0.1", 2116, nil, "active")
             checker:report_success("127.0.0.1", 2118, nil, "passive")
             checker:report_success("127.0.0.1", 2116, nil, "active")
             checker:report_success("127.0.0.1", 2118, nil, "passive")
             checker:report_success("127.0.0.1", 2116, nil, "active")
             checker:report_success("127.0.0.1", 2118, nil, "passive")
+            ngx.sleep(0.002)
             ngx.say(checker:get_target_status("127.0.0.1", 2116))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2118))  -- true
         }
@@ -157,15 +160,16 @@ events_module = "resty.events",
                     }
                 }
             })
-            ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2116, nil, false)
             local ok, err = checker:add_target("127.0.0.1", 2118, nil, false)
+            ngx.sleep(0.002)
             checker:report_success("127.0.0.1", 2116, nil, "active")
             checker:report_success("127.0.0.1", 2118, nil, "passive")
             checker:report_success("127.0.0.1", 2116, nil, "active")
             checker:report_success("127.0.0.1", 2118, nil, "passive")
             checker:report_success("127.0.0.1", 2116, nil, "active")
             checker:report_success("127.0.0.1", 2118, nil, "passive")
+            ngx.sleep(0.002)
             ngx.say(checker:get_target_status("127.0.0.1", 2116))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2118))  -- true
         }
@@ -230,11 +234,12 @@ events_module = "resty.events",
                     }
                 }
             })
-            ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2116, nil, false)
+            ngx.sleep(0.002)
             checker:report_success("127.0.0.1", 2116, nil, "active")
             checker:report_success("127.0.0.1", 2116, nil, "active")
             checker:report_success("127.0.0.1", 2116, nil, "active")
+            ngx.sleep(0.002)
             ngx.say(checker:get_target_status("127.0.0.1", 2116))  -- false
         }
     }
@@ -293,11 +298,12 @@ events_module = "resty.events",
                     }
                 }
             })
-            ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2118, nil, false)
+            ngx.sleep(0.002)
             checker:report_success("127.0.0.1", 2118, nil, "passive")
             checker:report_success("127.0.0.1", 2118, nil, "passive")
             checker:report_success("127.0.0.1", 2118, nil, "passive")
+            ngx.sleep(0.002)
             ngx.say(checker:get_target_status("127.0.0.1", 2118, nil))  -- false
         }
     }
