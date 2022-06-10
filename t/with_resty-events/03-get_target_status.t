@@ -15,6 +15,8 @@ our $HttpConfig = qq{
     init_worker_by_lua_block {
         local we = require "resty.events.compat"
         assert(we.configure({
+            unique_timeout = 5,
+            broker_id = 0,
             listening = "unix:$ENV{TEST_NGINX_SERVROOT}/worker_events.sock"
         }))
         assert(we.configured())
