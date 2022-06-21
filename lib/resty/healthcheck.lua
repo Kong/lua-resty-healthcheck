@@ -50,6 +50,7 @@ local RESTY_WORKER_EVENTS_VER = "0.3.3"
 local new_tab
 local nkeys
 local is_array
+local codec
 
 do
   local pcall = pcall
@@ -84,6 +85,11 @@ do
       end
       return true
     end
+  end
+
+  ok, codec = pcall(require, "string.buffer")
+  if not ok then
+      codec = require("cjson.safe").new()
   end
 end
 
@@ -228,17 +234,12 @@ local hcs = setmetatable({}, {
 
 local active_check_timer
 
--- TODO: improve serialization speed
 -- serialize a table to a string
-local function serialize(t)
-  return cjson.encode(t)
-end
+local serialize = codec.encode
 
 
 -- deserialize a string to a table
-local function deserialize(s)
-  return cjson.decode(s)
-end
+local deserialize = codec.decode
 
 
 local function key_for(key_prefix, ip, port, hostname)
