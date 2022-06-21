@@ -30,7 +30,6 @@ local DEBUG = ngx.DEBUG
 local ngx_log = ngx.log
 local tostring = tostring
 local ipairs = ipairs
-local cjson = require("cjson.safe").new()
 local table_insert = table.insert
 local table_remove = table.remove
 local resty_lock = require ("resty.lock")
