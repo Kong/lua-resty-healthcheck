@@ -1,3 +1,10 @@
+# This test is disabled
+#
+# All the test steps used here take longer than the request timeout because of
+# all the ngx.sleep needed to synchronize the events. Running them invididually
+# seem to work, so the solution is to split the integration test into smaller
+# tests.
+
 use Test::Nginx::Socket::Lua;
 use Cwd qw(cwd);
 

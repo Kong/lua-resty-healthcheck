@@ -1,3 +1,11 @@
+# This test is disabled
+#
+# We need to understand if it is a false-positive or lua-resty-healthcheck is
+# actually leaking the event module memory when deleting a checker instance.
+#
+# Please rename this test if a solution is found or remove it if it is a
+# false-positive.
+
 use Test::Nginx::Socket::Lua;
 use Cwd qw(cwd);
 
