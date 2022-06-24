@@ -1468,6 +1468,7 @@ end
 -- @return checker object, or `nil + error`
 function _M.new(opts)
 
+  opts = opts or {}
   local active_type = (((opts or EMPTY).checks or EMPTY).active or EMPTY).type
   local passive_type = (((opts or EMPTY).checks or EMPTY).passive or EMPTY).type
 
