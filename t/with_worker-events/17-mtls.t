@@ -29,8 +29,8 @@ qq{
             assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
 
             local pl_file = require "pl.file"
-            local cert = pl_file.read("t/util/cert.pem", true)
-            local key = pl_file.read("t/util/key.pem", true)
+            local cert = pl_file.read("t/with_worker-events/util/cert.pem", true)
+            local key = pl_file.read("t/with_worker-events/util/key.pem", true)
 
             local healthcheck = require("resty.healthcheck")
             local checker = healthcheck.new({
@@ -85,8 +85,8 @@ qq{
 
             local pl_file = require "pl.file"
             local ssl = require "ngx.ssl"
-            local cert = ssl.parse_pem_cert(pl_file.read("t/util/cert.pem", true))
-            local key = ssl.parse_pem_priv_key(pl_file.read("t/util/key.pem", true))
+            local cert = ssl.parse_pem_cert(pl_file.read("t/with_worker-events/util/cert.pem", true))
+            local key = ssl.parse_pem_priv_key(pl_file.read("t/with_worker-events/util/key.pem", true))
 
             local healthcheck = require("resty.healthcheck")
             local checker = healthcheck.new({

@@ -1,0 +1,136 @@
+name: Build and test
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: CI using lua-resty-events
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        openresty-version: [1.15.8.3, 1.17.8.2, 1.19.9.1, 1.21.4.1]
+
+    steps:
+      - name: Update and install OS dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y libssl-dev ssl-cert
+          sudo systemctl disable nginx
+          sudo systemctl stop nginx
+
+
+      - name: Set environment variables
+        env:
+          OPENRESTY_VER: ${{ matrix.openresty-version }}
+          RESTY_EVENTS_VER: 0.1.0
+          LUAROCKS_VER: 3.9.0
+          OPENSSL_VER: 1.1.1o
+          PCRE_VER: 8.45
+        run: |
+          echo "INSTALL_ROOT=$HOME/install-root" >> $GITHUB_ENV
+          echo "DOWNLOAD_ROOT=$HOME/download-root" >> $GITHUB_ENV
+          echo "OPENRESTY=$OPENRESTY_VER" >> $GITHUB_ENV
+          echo "LUAROCKS=$LUAROCKS_VER" >> $GITHUB_ENV
+          echo "OPENSSL=$OPENSSL_VER" >> $GITHUB_ENV
+          echo "PCRE=$PCRE_VER" >> $GITHUB_ENV
+          echo "RESTY_EVENTS=$RESTY_EVENTS_VER" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$HOME/install-root/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+      - name: Checkout lua-resty-healthcheck
+        uses: actions/checkout@v3
+
+      - name: Lookup build cache
+        uses: actions/cache@v3
+        id: cache-deps
+        with:
+          path: ${{ env.GITHUB_WORKSPACE }}/
+          key: ${{ runner.os }}-${{ hashFiles('**/.github/workflows/build_and_test_with_resty_events.yml') }}-${{ matrix.openresty-version }}
+
+      - name: Add to Path
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: echo "$INSTALL_ROOT/bin:$INSTALL_ROOT/nginx/sbin:$INSTALL_ROOT/luajit/bin:/usr/bin" >> $GITHUB_PATH
+
+      - name: Build and install OpenSSL
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          curl -sSLO https://www.openssl.org/source/openssl-$OPENSSL.tar.gz
+          tar -xzf openssl-$OPENSSL.tar.gz
+          cd openssl-$OPENSSL
+          ./config -g shared -DPURIFY no-threads --prefix=$INSTALL_ROOT --openssldir=$INSTALL_ROOT no-unit-test
+          make
+          make install_sw
+
+      - name: Checkout lua-resty-events
+        uses: actions/checkout@v3
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        with:
+          repository: Kong/lua-resty-events
+          ref: refs/tags/0.1.0
+          path: lua-resty-events
+
+      - name: Build and install OpenResty
+        if: steps.cache-deps.outputs.cache-hit != true
+        run: |
+          curl -sSLO https://openresty.org/download/openresty-$OPENRESTY.tar.gz
+          tar -xzf openresty-$OPENRESTY.tar.gz
+          cd openresty-$OPENRESTY
+          ./configure \
+              --prefix=$INSTALL_ROOT \
+              --with-cc-opt='-I$INSTALL_ROOT/include' \
+              --with-ld-opt='-L$INSTALL_ROOT/lib -Wl,-rpath,$INSTALL_ROOT/lib' \
+              --with-pcre-jit \
+              --with-http_ssl_module \
+              --with-http_realip_module \
+              --with-http_stub_status_module \
+              --with-http_v2_module \
+              --without-http_encrypted_session_module \
+              --with-stream_realip_module \
+              --with-stream_ssl_preread_module \
+              --add-module=../lua-resty-events \
+              --with-pcre
+          make
+          make install
+          make install LUA_LIBDIR=$INSTALL_ROOT/lualib
+
+      - name: Install LuaRocks
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          curl -sSLO https://luarocks.org/releases/luarocks-$LUAROCKS.tar.gz
+          tar -xzf luarocks-$LUAROCKS.tar.gz
+          cd luarocks-$LUAROCKS
+          ./configure \
+              --prefix=$INSTALL_ROOT \
+              --lua-suffix=jit \
+              --with-lua=$INSTALL_ROOT/luajit \
+              --with-lua-include=$INSTALL_ROOT/luajit/include/luajit-2.1
+          make build
+          make install
+
+      - name: Install manual dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          luarocks install luacheck
+
+      - name: Install Test::NGINX
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get install cpanminus
+          cpanm --notest --local-lib=$HOME/perl5 local::lib && eval $(perl -I $HOME/perl5/lib/perl5/ -Mlocal::lib)
+          cpanm --notest Test::Nginx
+
+      - name: Install lua-resty-events
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: |
+          cd lua-resty-events
+          OPENRESTY_PREFIX=$INSTALL_ROOT PREFIX=$INSTALL_ROOT LUA_LIB_DIR=$INSTALL_ROOT/lualib make install
+
+      - name: Install lua-resty-healthcheck
+        run: luarocks make
+
+      - name: Run tests
+        env:
+          PATH: ${{ env.INSTALL_ROOT }}/bin:${{ env.INSTALL_ROOT }}/nginx/sbin:${{ env.INSTALL_ROOT }}/luajit/bin:/usr/bin
+          TEST_NGINX_BINARY: ${{ env.INSTALL_ROOT }}/nginx/sbin/nginx
+        run: |
+          eval `luarocks path`
+          eval $(perl -I $HOME/perl5/lib/perl5/ -Mlocal::lib)
+          TEST_NGINX_RANDOMIZE=1 prove -I. -r t/with_resty-events

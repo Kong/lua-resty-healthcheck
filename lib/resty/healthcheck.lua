@@ -30,10 +30,8 @@ local DEBUG = ngx.DEBUG
 local ngx_log = ngx.log
 local tostring = tostring
 local ipairs = ipairs
-local cjson = require("cjson.safe").new()
 local table_insert = table.insert
 local table_remove = table.remove
-local worker_events = require("resty.worker.events")
 local resty_lock = require ("resty.lock")
 local re_find = ngx.re.find
 local bit = require("bit")
@@ -43,9 +41,15 @@ local ngx_worker_pid = ngx.worker.pid
 local ssl = require("ngx.ssl")
 local resty_timer = require "resty.timer"
 
+
+local RESTY_EVENTS_VER = "0.1.0"
+local RESTY_WORKER_EVENTS_VER = "0.3.3"
+
+
 local new_tab
 local nkeys
 local is_array
+local codec
 
 do
   local pcall = pcall
@@ -81,7 +85,38 @@ do
       return true
     end
   end
+
+  ok, codec = pcall(require, "string.buffer")
+  if not ok then
+      codec = require("cjson.safe").new()
+  end
 end
+
+
+local worker_events
+--- This function loads the worker events module received as arg. It will throw
+-- error() if it is not possible to load the module.
+local function load_events_module(self)
+  if self.events_module == "resty.worker.events" then
+    worker_events = require("resty.worker.events")
+    assert(worker_events, "could not load lua-resty-worker-events")
+    assert(worker_events._VERSION == RESTY_WORKER_EVENTS_VER,
+          "unsupported lua-resty-worker-events version")
+
+  elseif self.events_module == "resty.events" then
+    worker_events = require("resty.events.compat")
+    --assert(self.worker_events, "could not load lua-resty-events")
+    assert(worker_events._VERSION == RESTY_EVENTS_VER,
+          "unsupported lua-resty-events version")
+
+  else
+    error("unknown events module")
+  end
+
+  assert(worker_events.configured(), "please configure the '" ..
+          self.events_module .. "' module before using 'lua-resty-healthcheck'")
+end
+
 
 -- constants
 local EVENT_SOURCE_PREFIX = "lua-resty-healthcheck"
@@ -196,17 +231,12 @@ local hcs = setmetatable({}, {
 
 local active_check_timer
 
--- TODO: improve serialization speed
 -- serialize a table to a string
-local function serialize(t)
-  return cjson.encode(t)
-end
+local serialize = codec.encode
 
 
 -- deserialize a string to a table
-local function deserialize(s)
-  return cjson.decode(s)
-end
+local deserialize = codec.decode
 
 
 local function key_for(key_prefix, ip, port, hostname)
@@ -1334,6 +1364,7 @@ local defaults = {
   name = NO_DEFAULT,
   shm_name = NO_DEFAULT,
   type = NO_DEFAULT,
+  events_module = "resty.worker.events",
   checks = {
     active = {
       type = "http",
@@ -1437,13 +1468,13 @@ end
 -- @return checker object, or `nil + error`
 function _M.new(opts)
 
-  assert(worker_events.configured(), "please configure the " ..
-      "'lua-resty-worker-events' module before using 'lua-resty-healthcheck'")
-
+  opts = opts or {}
   local active_type = (((opts or EMPTY).checks or EMPTY).active or EMPTY).type
   local passive_type = (((opts or EMPTY).checks or EMPTY).passive or EMPTY).type
 
   local self = fill_in_settings(opts, defaults)
+
+  load_events_module(self)
 
   -- If using deprecated self.type, that takes precedence over
   -- a default value. TODO: remove this in a future version
