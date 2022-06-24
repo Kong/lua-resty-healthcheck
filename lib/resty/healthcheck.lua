@@ -96,18 +96,16 @@ end
 local worker_events
 --- This function loads the worker events module received as arg. It will throw
 -- error() if it is not possible to load the module.
-local function load_events_module(module_name)
-  module_name = module_name or "resty.worker.events"
-
-  if module_name == "resty.worker.events" then
+local function load_events_module(self)
+  if self.events_module == "resty.worker.events" then
     worker_events = require("resty.worker.events")
     assert(worker_events, "could not load lua-resty-worker-events")
     assert(worker_events._VERSION == RESTY_WORKER_EVENTS_VER,
           "unsupported lua-resty-worker-events version")
 
-  elseif module_name == "resty.events" then
+  elseif self.events_module == "resty.events" then
     worker_events = require("resty.events.compat")
-    assert(worker_events, "could not load lua-resty-events")
+    --assert(self.worker_events, "could not load lua-resty-events")
     assert(worker_events._VERSION == RESTY_EVENTS_VER,
           "unsupported lua-resty-events version")
 
@@ -116,7 +114,7 @@ local function load_events_module(module_name)
   end
 
   assert(worker_events.configured(), "please configure the '" ..
-          module_name .. "' module before using 'lua-resty-healthcheck'")
+          self.events_module .. "' module before using 'lua-resty-healthcheck'")
 end
 
 
@@ -1470,12 +1468,12 @@ end
 -- @return checker object, or `nil + error`
 function _M.new(opts)
 
-  load_events_module((opts or EMPTY).events_module)
-
   local active_type = (((opts or EMPTY).checks or EMPTY).active or EMPTY).type
   local passive_type = (((opts or EMPTY).checks or EMPTY).passive or EMPTY).type
 
   local self = fill_in_settings(opts, defaults)
+
+  load_events_module(self)
 
   -- If using deprecated self.type, that takes precedence over
   -- a default value. TODO: remove this in a future version
