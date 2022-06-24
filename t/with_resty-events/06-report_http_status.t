@@ -87,14 +87,14 @@ events_module = "resty.events",
             })
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 500, "passive")
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- false
         }
@@ -163,7 +163,7 @@ events_module = "resty.events",
             })
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, false)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, false)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
@@ -172,7 +172,7 @@ events_module = "resty.events",
             checker:report_http_status("127.0.0.1", 2113, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 200, "passive")
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- true
         }
@@ -241,12 +241,12 @@ events_module = "resty.events",
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, false)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "passive")
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2119, nil))  -- false
         }
     }
@@ -305,12 +305,12 @@ events_module = "resty.events",
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, false)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2119, nil))  -- false
         }
     }
@@ -369,12 +369,12 @@ events_module = "resty.events",
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- true
         }
     }
@@ -433,12 +433,12 @@ events_module = "resty.events",
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2119, nil))  -- true
         }
     }
@@ -481,13 +481,13 @@ events_module = "resty.events",
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
         }
     }

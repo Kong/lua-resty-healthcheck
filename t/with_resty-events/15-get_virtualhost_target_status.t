@@ -77,20 +77,20 @@ events_module = "resty.events",
             })
             local ok, err = checker:add_target("127.0.0.1", 2115, "ahostname", true)
             local ok, err = checker:add_target("127.0.0.1", 2115, "otherhostname", true)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2115, "ahostname"))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2115, "otherhostname"))  -- true
             checker:report_http_status("127.0.0.1", 2115, "otherhostname", 500, "passive")
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2115, "otherhostname"))  -- true
             checker:report_http_status("127.0.0.1", 2115, "otherhostname", 500, "passive")
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2115, "otherhostname"))  -- false
             checker:report_success("127.0.0.1", 2115, "otherhostname")
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2115, "otherhostname"))  -- true
             checker:report_tcp_failure("127.0.0.1", 2115, "otherhostname")
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2115, "otherhostname"))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2115, "ahostname"))  -- true
             local _, err = checker:get_target_status("127.0.0.1", 2115)
@@ -154,11 +154,11 @@ events_module = "resty.events",
             })
             local ok, err = checker:add_target("127.0.0.1", 2116, "ahostname", true)
             local ok, err = checker:add_target("127.0.0.1", 2116, nil, true)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2116, "ahostname"))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2116))  -- true
             checker:report_http_status("127.0.0.1", 2116, nil, 500, "passive")
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2116, "ahostname"))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2116)) -- false
         }
@@ -281,19 +281,19 @@ events_module = "resty.events",
             })
             local ok, err = checker:add_target("127.0.0.1", 2118, "127.0.0.1", true)
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2118, "127.0.0.1"))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2118))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2119, "127.0.0.1"))  -- true
             checker:report_http_status("127.0.0.1", 2118, nil, 500, "passive")
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2118, "127.0.0.1"))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2118))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2119, "127.0.0.1"))  -- true
             checker:report_http_status("127.0.0.1", 2119, "127.0.0.1", 500, "passive")
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2118, "127.0.0.1"))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2118))  -- false

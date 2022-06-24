@@ -54,15 +54,15 @@ events_module = "resty.events",
             })
             checker:add_target("127.0.0.1", 2112, "rush", true)
             checker:add_target("127.0.0.2", 2112, "rush", true)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2112, "rush"))  -- true
             ngx.say(checker:get_target_status("127.0.0.2", 2112, "rush"))  -- true
             checker:set_all_target_statuses_for_hostname("rush", 2112, false)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2112, "rush"))  -- false
             ngx.say(checker:get_target_status("127.0.0.2", 2112, "rush"))  -- false
             checker:set_all_target_statuses_for_hostname("rush", 2112, true)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2112, "rush"))  -- true
             ngx.say(checker:get_target_status("127.0.0.2", 2112, "rush"))  -- true
         }
@@ -102,15 +102,15 @@ events_module = "resty.events",
             })
             checker:add_target("127.0.0.1", 2112, "rush", true)
             checker:add_target("127.0.0.2", 2112, "rush", true)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2112, "rush"))  -- true
             ngx.say(checker:get_target_status("127.0.0.2", 2112, "rush"))  -- true
             checker:report_http_status("127.0.0.1", 2112, "rush", 500)
             checker:report_http_status("127.0.0.1", 2112, "rush", 500)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2112, "rush"))  -- false
             checker:set_all_target_statuses_for_hostname("rush", 2112, true)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2112, "rush"))  -- true
             ngx.say(checker:get_target_status("127.0.0.2", 2112, "rush"))  -- true
         }
@@ -152,17 +152,17 @@ events_module = "resty.events",
             })
             checker:add_target("127.0.0.1", 2112, "rush", true)
             checker:add_target("127.0.0.2", 2112, "rush", true)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2112, "rush"))  -- true
             ngx.say(checker:get_target_status("127.0.0.2", 2112, "rush"))  -- true
             checker:report_http_status("127.0.0.1", 2112, "rush", 500)
             checker:set_all_target_statuses_for_hostname("rush", 2112, true)
             checker:report_http_status("127.0.0.1", 2112, "rush", 500)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2112, "rush"))  -- true
             ngx.say(checker:get_target_status("127.0.0.2", 2112, "rush"))  -- true
             checker:report_http_status("127.0.0.1", 2112, "rush", 500)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2112, "rush"))  -- false
             ngx.say(checker:get_target_status("127.0.0.2", 2112, "rush"))  -- true
         }
@@ -205,19 +205,19 @@ qq{
             })
             checker:add_target("127.0.0.1", 2112, "rush", true)
             checker:add_target("127.0.0.2", 2112, "rush", true)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             checker:set_all_target_statuses_for_hostname("rush", 2112, false)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2112, "rush"))  -- false
             ngx.say(checker:get_target_status("127.0.0.2", 2112, "rush"))  -- false
             checker:report_http_status("127.0.0.1", 2112, "rush", 200)
             checker:set_all_target_statuses_for_hostname("rush", 2112, false)
             checker:report_http_status("127.0.0.1", 2112, "rush", 200)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2112, "rush"))  -- false
             ngx.say(checker:get_target_status("127.0.0.2", 2112, "rush"))  -- false
             checker:report_http_status("127.0.0.1", 2112, "rush", 200)
-            ngx.sleep(0.002)
+            ngx.sleep(0.01)
             ngx.say(checker:get_target_status("127.0.0.1", 2112, "rush"))  -- true
             ngx.say(checker:get_target_status("127.0.0.2", 2112, "rush"))  -- false
         }
