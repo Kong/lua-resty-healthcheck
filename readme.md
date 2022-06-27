@@ -91,6 +91,18 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.6.0 (27-Jun-2022)
+
+* Introduce support to [lua-resty-events](https://github.com/Kong/lua-resty-events)
+  module in addition to [lua-resty-worker-events](https://github.com/Kong/lua-resty-worker-events)
+  support. With this addition, the lua-resty-healthcheck luarocks package does
+  not require a specific event-sharing module anymore, but you are still
+  required to provide either lua-resty-worker-events or lua-resty-events.
+  [#105](https://github.com/Kong/lua-resty-healthcheck/pull/105)
+* If available, lua-resty-healthcheck now uses `string.buffer`, the new LuaJIT's
+  serialization API. If it is unavailable, lua-resty-healthcheck fallbacks to
+  cjson.  [#109](https://github.com/Kong/lua-resty-healthcheck/pull/109)
+
 ### 1.5.1 (23-Mar-2022)
 
 * Fix: avoid breaking active health checks when adding or removing targets.
