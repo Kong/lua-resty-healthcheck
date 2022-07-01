@@ -1144,7 +1144,12 @@ local function checker_callback(self, health_mode)
 
   -- create a list of targets to check, here we can still do this atomically
   local list_to_check = {}
-  local targets = fetch_target_list(self)
+  local targets, err = fetch_target_list(self)
+  if not targets then
+    self:log(ERR, "checker_callback: ", err)
+    return
+  end
+
   for _, target in ipairs(targets) do
     local tgt = get_target(self, target.ip, target.port, target.hostname)
     local internal_health = tgt and tgt.internal_health or nil
