@@ -414,7 +414,7 @@ function checker:add_target(ip, port, hostname, is_healthy, hostheader)
         if target.purge_time == nil then
           self:log(DEBUG, "adding an existing target: ", hostname or "", " ", ip,
                   ":", port, " (ignoring)")
-          return
+          return false
         end
         target.purge_time = nil
         found = true
