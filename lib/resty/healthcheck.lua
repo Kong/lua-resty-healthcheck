@@ -36,18 +36,20 @@ local table_concat = table.concat
 local string_format = string.format
 local resty_timer = require("resty.timer")
 local worker_events = require("resty.worker.events")
-local resty_lock = require ("resty.lock")
 local re_find = ngx.re.find
 local bit = require("bit")
 local ngx_worker_exiting = ngx.worker.exiting
 local ssl = require("ngx.ssl")
+local pcall = pcall
+local get_phase = ngx.get_phase
+local type = type
+local assert = assert
 
 local new_tab
 local nkeys
 local is_array
 
 do
-  local pcall = pcall
   local ok
 
   ok, new_tab = pcall(require, "table.new")
@@ -202,7 +204,7 @@ local ngx_timer_at do
   end
 
   ngx_timer_at = function(...)
-    local phase = ngx.get_phase()
+    local phase = get_phase()
     if phase ~= "init" and phase ~= "init_worker" then
       -- we're past init/init_worker, so replace this temp function with the
       -- real-deal again, so from here on we run regular timers.
@@ -220,6 +222,121 @@ local ngx_timer_at do
   end
 
 end
+
+
+local run_locked
+do
+  local resty_lock = require "resty.lock"
+
+  local yieldable = {
+    rewrite = true,
+    access  = true,
+    content = true,
+    timer   = true,
+  }
+
+  local function run_in_timer(premature, fn, ...)
+    if premature then
+      return
+    end
+
+    return fn(...)
+  end
+
+  local function schedule(fn, ...)
+    return ngx_timer_at(0, run_in_timer, fn, ...)
+  end
+
+  -- timeout when yieldable
+  local timeout = 5
+
+  -- resty.lock consumes these options immediately, so this table can be reused
+  local opts = {
+    exptime = 10,      -- timeout after which lock is released anyway
+    timeout = timeout, -- max wait time to acquire lock
+  }
+
+  ---
+  -- Acquire a lock and run a function
+  --
+  -- The function call itself is wrapped with `pcall` to protect against
+  -- exception.
+  --
+  -- This function exhibits some special behavior when called during a
+  -- non-yieldable phase such as `init_worker` or `log`:
+  --
+  -- 1. The lock timeout is set to 0 to ensure that `resty.lock` does not
+  --    attempt to sleep/yield
+  -- 2. If acquiring the lock fails due to a timeout, `run_locked`
+  --    (this function) is re-scheduled to run in a timer. In this case,
+  --    the function returns `nil, "scheduled"`
+  --
+  -- @param self The checker object
+  -- @param key the key/identifier to acquire a lock for
+  -- @param fn The function to execute
+  -- @param ... arguments that will be passed to fn
+  -- @return The results of the function; or nil and an error message
+  -- in case it fails locking.
+  function run_locked(self, key, fn, ...)
+    -- we're extra extra extra defensive in this code path
+    local typ = type(key)
+     -- XXX is a number key ever expected?
+    assert(typ == "string" or typ == "number",
+           "unexpected lock key type: " .. typ)
+    key = tostring(key)
+
+    -- first aqcuire a lock or conditionally re-schedule ourselves in a timer
+    local lock
+    do
+      local yield = yieldable[get_phase()]
+
+      if yield then
+        opts.timeout = timeout
+      else
+        -- if yielding is not possible in the current phase, use a zero timeout
+        -- so that resty.lock will return `nil, "timeout"` immediately instead of
+        -- calling ngx.sleep()
+        opts.timeout = 0
+      end
+
+      local err
+      lock, err = resty_lock:new(self.shm_name, opts)
+      if not lock then
+        return nil, "failed creating lock for '" .. key .. "', " .. err
+      end
+
+      local elapsed
+      elapsed, err = lock:lock(key)
+
+      if not elapsed and err == "timeout" and not yield then
+        -- yielding is not possible in the current phase, so retry in a timer
+        local _, terr = schedule(run_locked, self, key, fn, ...)
+        if terr ~= nil then
+          return nil, terr
+        end
+
+        return nil, "scheduled"
+
+      elseif not elapsed then
+        return nil, "failed acquiring lock for '" .. key .. "', " .. err
+      end
+    end
+
+    local pok, perr, res = pcall(fn, ...)
+
+    local ok, err = lock:unlock()
+    if not ok then
+      self:log(ERR, "failed unlocking '", key, "', ", err)
+    end
+
+    if not pok then
+      return nil, perr
+    else
+      return perr, res
+    end
+  end
+end
+
 
 
 local _M = {}
@@ -264,57 +381,15 @@ local function fetch_target_list(self)
 end
 
 
---- Helper function to run the function holding a lock on the target list.
--- @see locking_target_list
-local function run_fn_locked_target_list(premature, self, fn)
-
-  if premature then
-    return
+local function with_target_list(self, fn)
+  local targets, err = fetch_target_list(self)
+  if not targets then
+    return nil, err
   end
 
-  local tl_lock, lock_err = resty_lock:new(self.shm_name, {
-    exptime = 10,  -- timeout after which lock is released anyway
-    timeout = 5,   -- max wait time to acquire lock
-  })
-
-  if not tl_lock then
-    return nil, "failed to create lock:" .. lock_err
-  end
-
-  local pok, perr, lerr = pcall(tl_lock.lock, tl_lock, self.TARGET_LIST_LOCK)
-  if not pok then
-    self:log(ERR, "resty.lock threw an exception: ", perr)
-    return nil, perr
-
-  elseif lerr == "timeout" or lerr == "locked" then
-    -- this is the only condition that allows the function to be retried
-    self:log(DEBUG, "failed to acquire lock: ", lerr)
-    return nil, "failed to acquire lock"
-
-  elseif not perr then
-    self:log(ERR, "unhandled error from resty.lock: ", lerr)
-    return nil, lerr
-  end
-
-  local target_list, err = fetch_target_list(self)
-
-  local final_ok, final_err
-
-  if target_list then
-    final_ok, final_err = pcall(fn, target_list)
-  else
-    final_ok, final_err = nil, err
-  end
-
-  local ok
-  ok, err = tl_lock:unlock()
-  if not ok then
-    -- recoverable: not returning this error, only logging it
-    self:log(ERR, "failed to release lock '", self.TARGET_LIST_LOCK,
-        "': ", err)
-  end
-
-  return final_ok, final_err
+  -- this is only ever called in the context of `run_locked`,
+  -- so no pcall needed
+  return fn(targets)
 end
 
 
@@ -324,15 +399,11 @@ end
 -- @return The results of the function; or nil and an error message
 -- in case it fails locking.
 local function locking_target_list(self, fn)
+  local ok, err = run_locked(self, self.TARGET_LIST_LOCK, with_target_list, self, fn)
 
-  local ok, err = run_fn_locked_target_list(false, self, fn)
-  if err == "failed to acquire lock" then
-    local _, terr = ngx_timer_at(0, run_fn_locked_target_list, self, fn)
-    if terr ~= nil then
-      return nil, terr
-    end
-
-    return true
+  if not ok and err == "scheduled" then
+    self:log(DEBUG, "target_list function re-scheduled in timer")
+    ok = true
   end
 
   return ok, err
@@ -542,41 +613,6 @@ end
 ------------------------------------------------------------------------------
 
 
---- Helper function to actually run the function holding a lock on the target.
--- @see locking_target
-local function run_mutexed_fn(premature, self, ip, port, hostname, fn)
-  if premature then
-    return
-  end
-
-  local tlock, lock_err = resty_lock:new(self.shm_name, {
-                  exptime = 10,  -- timeout after which lock is released anyway
-                  timeout = 5,   -- max wait time to acquire lock
-                })
-  if not tlock then
-    return nil, "failed to create lock:" .. lock_err
-  end
-  local lock_key = key_for(self.TARGET_LOCK, ip, port, hostname)
-
-  local pok, perr = pcall(tlock.lock, tlock, lock_key)
-  if not pok then
-    self:log(DEBUG, "failed to acquire lock: ", perr)
-    return nil, "failed to acquire lock"
-  end
-
-  local final_ok, final_err = pcall(fn)
-
-  local ok, err = tlock:unlock()
-  if not ok then
-    -- recoverable: not returning this error, only logging it
-    self:log(ERR, "failed to release lock '", lock_key, "': ", err)
-  end
-
-  return final_ok, final_err
-
-end
-
-
 -- Run the given function holding a lock on the target.
 -- @param self The checker object
 -- @param ip Target IP
@@ -586,14 +622,13 @@ end
 -- @return The results of the function; or true in case it fails locking and
 -- will retry asynchronously; or nil+err in case it fails to retry.
 local function locking_target(self, ip, port, hostname, fn)
-  local ok, err = run_mutexed_fn(false, self, ip, port, hostname, fn)
-  if err == "failed to acquire lock" then
-    local _, terr = ngx_timer_at(0, run_mutexed_fn, self, ip, port, hostname, fn)
-    if terr ~= nil then
-      return nil, terr
-    end
+  local key = key_for(self.TARGET_LOCK, ip, port, hostname)
 
-    return true
+  local ok, err = run_locked(self, key, fn)
+
+  if not ok and err == "scheduled" then
+    self:log(DEBUG, "target function for ", key, " was re-scheduled")
+    ok = true
   end
 
   return ok, err
