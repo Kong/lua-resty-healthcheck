@@ -406,7 +406,7 @@ function checker:add_target(ip, port, hostname, is_healthy, hostheader)
   local internal_health = is_healthy and "healthy" or "unhealthy"
 
   local ok, err = locking_target_list(self, function(target_list)
-  local found = false
+    local found = false
 
     -- check whether we already have this target
     for _, target in ipairs(target_list) do
