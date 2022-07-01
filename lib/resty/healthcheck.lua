@@ -281,10 +281,19 @@ local function run_fn_locked_target_list(premature, self, fn)
     return nil, "failed to create lock:" .. lock_err
   end
 
-  local pok, perr = pcall(tl_lock.lock, tl_lock, self.TARGET_LIST_LOCK)
+  local pok, perr, lerr = pcall(tl_lock.lock, tl_lock, self.TARGET_LIST_LOCK)
   if not pok then
-    self:log(DEBUG, "failed to acquire lock: ", perr)
+    self:log(ERR, "resty.lock threw an exception: ", perr)
+    return nil, perr
+
+  elseif lerr == "timeout" or lerr == "locked" then
+    -- this is the only condition that allows the function to be retried
+    self:log(DEBUG, "failed to acquire lock: ", lerr)
     return nil, "failed to acquire lock"
+
+  elseif not perr then
+    self:log(ERR, "unhandled error from resty.lock: ", lerr)
+    return nil, lerr
   end
 
   local target_list, err = fetch_target_list(self)
