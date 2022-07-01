@@ -34,7 +34,6 @@ local cjson = require("cjson.safe").new()
 local table_insert = table.insert
 local table_remove = table.remove
 local worker_events = require("resty.worker.events")
-local resty_lock = require ("resty.lock")
 local re_find = ngx.re.find
 local bit = require("bit")
 local ngx_now = ngx.now
@@ -349,51 +348,6 @@ local function fetch_target_list(self)
 end
 
 
---- Helper function to run the function holding a lock on the target list.
--- @see locking_target_list
-local function run_fn_locked_target_list(premature, self, fn)
-
-  if premature then
-    return
-  end
-
-  local lock, lock_err = resty_lock:new(self.shm_name, {
-    exptime = 10,  -- timeout after which lock is released anyway
-    timeout = 5,   -- max wait time to acquire lock
-  })
-
-  if not lock then
-    return nil, "failed to create lock:" .. lock_err
-  end
-
-  local pok, perr = pcall(resty_lock.lock, lock, self.TARGET_LIST_LOCK)
-  if not pok then
-    self:log(DEBUG, "failed to acquire lock: ", perr)
-    return nil, "failed to acquire lock"
-  end
-
-  local target_list, err = fetch_target_list(self)
-
-  local final_ok, final_err
-
-  if target_list then
-    final_ok, final_err = pcall(fn, target_list)
-  else
-    final_ok, final_err = nil, err
-  end
-
-  local ok
-  ok, err = lock:unlock()
-  if not ok then
-    -- recoverable: not returning this error, only logging it
-    self:log(ERR, "failed to release lock '", self.TARGET_LIST_LOCK,
-        "': ", err)
-  end
-
-  return final_ok, final_err
-end
-
-
 local function with_target_list(self, fn)
   local targets, err = fetch_target_list(self)
   if not targets then
@@ -655,41 +609,6 @@ end
 -- Functions that allow reporting of failures/successes for passive checks.
 -- @section health-management
 ------------------------------------------------------------------------------
-
-
---- Helper function to actually run the function holding a lock on the target.
--- @see locking_target
-local function run_mutexed_fn(premature, self, ip, port, hostname, fn)
-  if premature then
-    return
-  end
-
-  local lock, lock_err = resty_lock:new(self.shm_name, {
-                  exptime = 10,  -- timeout after which lock is released anyway
-                  timeout = 5,   -- max wait time to acquire lock
-                })
-  if not lock then
-    return nil, "failed to create lock:" .. lock_err
-  end
-  local lock_key = key_for(self.TARGET_LOCK, ip, port, hostname)
-
-  local pok, perr = pcall(resty_lock.lock, lock, lock_key)
-  if not pok then
-    self:log(DEBUG, "failed to acquire lock: ", perr)
-    return nil, "failed to acquire lock"
-  end
-
-  local final_ok, final_err = pcall(fn)
-
-  local ok, err = lock:unlock()
-  if not ok then
-    -- recoverable: not returning this error, only logging it
-    self:log(ERR, "failed to release lock '", lock_key, "': ", err)
-  end
-
-  return final_ok, final_err
-
-end
 
 
 -- Run the given function holding a lock on the target.
