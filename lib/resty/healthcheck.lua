@@ -236,11 +236,9 @@ do
   }
 
   local function run_in_timer(premature, fn, ...)
-    if premature then
-      return
+    if not premature then
+      fn(...)
     end
-
-    return fn(...)
   end
 
   local function schedule(fn, ...)
