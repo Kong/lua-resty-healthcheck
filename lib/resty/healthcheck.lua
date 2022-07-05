@@ -400,7 +400,7 @@ end
 local function locking_target_list(self, fn)
   local ok, err = run_locked(self, self.TARGET_LIST_LOCK, with_target_list, self, fn)
 
-  if not ok == "scheduled" then
+  if ok == "scheduled" then
     self:log(DEBUG, "target_list function re-scheduled in timer")
   end
 
