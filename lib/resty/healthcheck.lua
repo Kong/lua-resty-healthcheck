@@ -395,7 +395,7 @@ end
 --- Run the given function holding a lock on the target list.
 -- @param self The checker object
 -- @param fn The function to execute
--- @return The results of the function, "scheduled" if the function was
+-- @return The results of the function; "scheduled" if the function was
 --   scheduled in a timer, or nil and an error message in case of failure
 local function locking_target_list(self, fn)
   local ok, err = run_locked(self, self.TARGET_LIST_LOCK, with_target_list, self, fn)
@@ -617,7 +617,7 @@ end
 -- @param port Target port
 -- @param hostname Target hostname
 -- @param fn The function to execute
--- @return The results of the function, or "scheduled" in case it fails locking and
+-- @return The results of the function; or "scheduled" in case it fails locking and
 -- will retry asynchronously; or nil+err in case it fails to retry.
 local function locking_target(self, ip, port, hostname, fn)
   local key = key_for(self.TARGET_LOCK, ip, port, hostname)
