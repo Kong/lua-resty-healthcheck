@@ -230,6 +230,14 @@ end
 
 local run_locked
 do
+  -- resty_lock is restricted to this scope in order to keep sensitive
+  -- lock-handling code separate separate from all other business logic
+  --
+  -- If you need to use resty_lock in a way that is not covered by the
+  -- `run_locked` helper function defined below, it's strongly-advised to
+  -- define it fully within this scope unless you have a very good reason
+  --
+  -- (see https://github.com/Kong/lua-resty-healthcheck/pull/112)
   local resty_lock = require "resty.lock"
 
   local yieldable = {
