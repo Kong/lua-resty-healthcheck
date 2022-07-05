@@ -267,7 +267,8 @@ do
   --    attempt to sleep/yield
   -- 2. If acquiring the lock fails due to a timeout, `run_locked`
   --    (this function) is re-scheduled to run in a timer. In this case,
-  --    the function returns `nil, "scheduled"`
+  --    the function returns `"scheduled"` instead of the return value of
+  --    the locked function
   --
   -- @param self The checker object
   -- @param key the key/identifier to acquire a lock for
@@ -308,12 +309,12 @@ do
 
       if not elapsed and err == "timeout" and not yield then
         -- yielding is not possible in the current phase, so retry in a timer
-        local _, terr = schedule(run_locked, self, key, fn, ...)
-        if terr ~= nil then
+        local ok, terr = schedule(run_locked, self, key, fn, ...)
+        if not ok then
           return nil, terr
         end
 
-        return nil, "scheduled"
+        return "scheduled"
 
       elseif not elapsed then
         return nil, "failed acquiring lock for '" .. key .. "', " .. err
@@ -394,14 +395,13 @@ end
 --- Run the given function holding a lock on the target list.
 -- @param self The checker object
 -- @param fn The function to execute
--- @return The results of the function; or nil and an error message
--- in case it fails locking.
+-- @return The results of the function, "scheduled" if the function was
+--   scheduled in a timer, or nil and an error message in case of failure
 local function locking_target_list(self, fn)
   local ok, err = run_locked(self, self.TARGET_LIST_LOCK, with_target_list, self, fn)
 
-  if not ok and err == "scheduled" then
+  if not ok == "scheduled" then
     self:log(DEBUG, "target_list function re-scheduled in timer")
-    ok = true
   end
 
   return ok, err
@@ -617,16 +617,15 @@ end
 -- @param port Target port
 -- @param hostname Target hostname
 -- @param fn The function to execute
--- @return The results of the function; or true in case it fails locking and
+-- @return The results of the function, or "scheduled" in case it fails locking and
 -- will retry asynchronously; or nil+err in case it fails to retry.
 local function locking_target(self, ip, port, hostname, fn)
   local key = key_for(self.TARGET_LOCK, ip, port, hostname)
 
   local ok, err = run_locked(self, key, fn)
 
-  if not ok and err == "scheduled" then
+  if ok == "scheduled" then
     self:log(DEBUG, "target function for ", key, " was re-scheduled")
-    ok = true
   end
 
   return ok, err
