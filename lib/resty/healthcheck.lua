@@ -24,26 +24,30 @@
 -- @author Hisham Muhammad, Thijs Schreijer
 -- @license Apache 2.0
 
+local bit = require("bit")
+local cjson = require("cjson.safe").new()
+local resty_timer = require("resty.timer")
+local ssl = require("ngx.ssl")
+local worker_events = require("resty.worker.events")
+-- local resty_lock = require("resty.lock") -- required later in the file"
+
 local ERR = ngx.ERR
 local WARN = ngx.WARN
 local DEBUG = ngx.DEBUG
 local ngx_log = ngx.log
+local re_find = ngx.re.find
+local ngx_worker_exiting = ngx.worker.exiting
+local get_phase = ngx.get_phase
+
 local tostring = tostring
 local ipairs = ipairs
-local cjson = require("cjson.safe").new()
+local pcall = pcall
+local type = type
+local assert = assert
+
 local table_remove = table.remove
 local table_concat = table.concat
 local string_format = string.format
-local resty_timer = require("resty.timer")
-local worker_events = require("resty.worker.events")
-local re_find = ngx.re.find
-local bit = require("bit")
-local ngx_worker_exiting = ngx.worker.exiting
-local ssl = require("ngx.ssl")
-local pcall = pcall
-local get_phase = ngx.get_phase
-local type = type
-local assert = assert
 
 local new_tab
 local nkeys
