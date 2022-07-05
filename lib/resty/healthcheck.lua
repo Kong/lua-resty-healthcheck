@@ -32,6 +32,7 @@ local tostring = tostring
 local ipairs = ipairs
 local table_insert = table.insert
 local table_remove = table.remove
+local string_format = string.format
 local resty_lock = require ("resty.lock")
 local re_find = ngx.re.find
 local bit = require("bit")
@@ -240,7 +241,7 @@ local deserialize = codec.decode
 
 
 local function key_for(key_prefix, ip, port, hostname)
-  return string.format("%s:%s:%s%s", key_prefix, ip, port, hostname and ":" .. hostname or "")
+  return string_format("%s:%s:%s%s", key_prefix, ip, port, hostname and ":" .. hostname or "")
 end
 
 
