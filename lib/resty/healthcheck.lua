@@ -34,13 +34,14 @@ local cjson = require("cjson.safe").new()
 local table_insert = table.insert
 local table_remove = table.remove
 local worker_events = require("resty.worker.events")
-local re_find = ngx.re.find
+-- local resty_lock = require("resty.lock") -- required later in the file"
+local ssl = require("ngx.ssl")
+local resty_timer = require "resty.timer"
 local bit = require("bit")
+local re_find = ngx.re.find
 local ngx_now = ngx.now
 local ngx_worker_id = ngx.worker.id
 local ngx_worker_pid = ngx.worker.pid
-local ssl = require("ngx.ssl")
-local resty_timer = require "resty.timer"
 local pcall = pcall
 local get_phase = ngx.get_phase
 local type = type
@@ -217,6 +218,14 @@ end
 
 local run_locked
 do
+  -- resty_lock is restricted to this scope in order to keep sensitive
+  -- lock-handling code separate separate from all other business logic
+  --
+  -- If you need to use resty_lock in a way that is not covered by the
+  -- `run_locked` helper function defined below, it's strongly-advised to
+  -- define it fully within this scope unless you have a very good reason
+  --
+  -- (see https://github.com/Kong/lua-resty-healthcheck/pull/112)
   local resty_lock = require "resty.lock"
 
   local yieldable = {
@@ -260,7 +269,7 @@ do
   --    attempt to sleep/yield
   -- 2. If acquiring the lock fails due to a timeout, `run_locked`
   --    (this function) is re-scheduled to run in a timer. In this case,
-  --    the function returns `nil, "scheduled"`
+  --    the function returns `"scheduled"`
   --
   -- @param self The checker object
   -- @param key the key/identifier to acquire a lock for
@@ -301,12 +310,12 @@ do
 
       if not elapsed and err == "timeout" and not yield then
         -- yielding is not possible in the current phase, so retry in a timer
-        local _, terr = schedule(run_locked, self, key, fn, ...)
-        if terr ~= nil then
+        local ok, terr = schedule(run_locked, self, key, fn, ...)
+        if not ok then
           return nil, terr
         end
 
-        return nil, "scheduled"
+        return "scheduled"
 
       elseif not elapsed then
         return nil, "failed acquiring lock for '" .. key .. "', " .. err
@@ -322,9 +331,9 @@ do
 
     if not pok then
       return nil, perr
-    else
-      return perr, res
     end
+
+    return perr, res
   end
 end
 local checker = {}
@@ -368,9 +377,8 @@ end
 local function locking_target_list(self, fn)
   local ok, err = run_locked(self, self.TARGET_LIST_LOCK, with_target_list, self, fn)
 
-  if not ok and err == "scheduled" then
+  if ok == "scheduled" then
     self:log(DEBUG, "target_list function re-scheduled in timer")
-    ok = true
   end
 
   return ok, err
@@ -624,9 +632,8 @@ local function locking_target(self, ip, port, hostname, fn)
 
   local ok, err = run_locked(self, key, fn)
 
-  if not ok and err == "scheduled" then
+  if ok == "scheduled" then
     self:log(DEBUG, "target function for ", key, " was re-scheduled")
-    ok = true
   end
 
   return ok, err
