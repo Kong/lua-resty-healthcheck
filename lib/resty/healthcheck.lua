@@ -235,16 +235,25 @@ do
     timer   = true,
   }
 
-  local function run_in_timer(premature, fn, ...)
+  local function run_in_timer(premature, self, key, fn, ...)
     if premature then
       return
     end
 
-    return fn(...)
+    local ok, err = run_locked(self, key, fn, ...)
+    if not ok then
+      self:log(ERR, "locked function for key '", key, "' failed in timer: ", err)
+    end
   end
 
-  local function schedule(fn, ...)
-    return ngx.timer.at(0, run_in_timer, fn, ...)
+  local function schedule(self, key, fn, ...)
+    local ok, err = ngx.timer.at(0, run_in_timer, self, key, fn, ...)
+    if not ok then
+      return nil, "failed scheduling locked function for key '" .. key ..
+                  "', " .. err
+    end
+
+    return "scheduled"
   end
 
   -- timeout when yieldable
@@ -310,12 +319,7 @@ do
 
       if not elapsed and err == "timeout" and not yield then
         -- yielding is not possible in the current phase, so retry in a timer
-        local ok, terr = schedule(run_locked, self, key, fn, ...)
-        if not ok then
-          return nil, terr
-        end
-
-        return "scheduled"
+        return schedule(self, key, fn, ...)
 
       elseif not elapsed then
         return nil, "failed acquiring lock for '" .. key .. "', " .. err
