@@ -274,13 +274,14 @@ do
   --    (this function) is re-scheduled to run in a timer. In this case,
   --    the function returns `"scheduled"`
   --
-  -- @param self The checker object
   -- @param key the key/identifier to acquire a lock for
+  -- @param shm_name the shared dict to store the lock
+  -- @param log_prfx log prefix to use
   -- @param fn The function to execute
   -- @param ... arguments that will be passed to fn
   -- @return The results of the function; or nil and an error message
   -- in case it fails locking.
-  function run_locked(self, key, fn, ...)
+  function run_locked(key, shm_name, log_prfx, fn, ...)
     -- we're extra extra extra defensive in this code path
     local typ = type(key)
      -- XXX is a number key ever expected?
@@ -288,7 +289,7 @@ do
            "unexpected lock key type: " .. typ)
     key = tostring(key)
 
-    -- first aqcuire a lock or conditionally re-schedule ourselves in a timer
+    -- first acquire a lock or conditionally re-schedule ourselves in a timer
     local lock
     do
       local yield = yieldable[get_phase()]
@@ -303,7 +304,7 @@ do
       end
 
       local err
-      lock, err = resty_lock:new(self.shm_name, opts)
+      lock, err = resty_lock:new(shm_name, opts)
       if not lock then
         return nil, "failed creating lock for '" .. key .. "', " .. err
       end
@@ -313,7 +314,7 @@ do
 
       if not elapsed and err == "timeout" and not yield then
         -- yielding is not possible in the current phase, so retry in a timer
-        local ok, terr = schedule(run_locked, self, key, fn, ...)
+        local ok, terr = schedule(run_locked, key, shm_name, log_prfx, fn, ...)
         if not ok then
           return nil, terr
         end
@@ -329,7 +330,7 @@ do
 
     local ok, err = lock:unlock()
     if not ok then
-      self:log(ERR, "failed unlocking '", key, "', ", err)
+      ngx_log(ERR, worker_color(log_prfx), "failed unlocking '", key, "', ", err)
     end
 
     if not pok then
@@ -378,10 +379,21 @@ end
 -- @return The results of the function; or nil and an error message
 -- in case it fails locking.
 local function locking_target_list(self, fn)
-  local ok, err = run_locked(self, self.TARGET_LIST_LOCK, with_target_list, self, fn)
+  local checker_obj
+  -- check if we received a checker object or a list of checker objects
+  if self.shm_name then
+    checker_obj = self
+  elseif self[1] and self[1].shm_name then
+    checker_obj = self[1]
+  else
+    return nil, "invalid checker object received"
+  end
+
+  local ok, err = run_locked(checker_obj.TARGET_LIST_LOCK, checker_obj.shm_name,
+                  checker_obj.LOG_PREFIX, with_target_list, checker_obj, fn)
 
   if ok == "scheduled" then
-    self:log(DEBUG, "target_list function re-scheduled in timer")
+    checker_obj:log(DEBUG, "target_list function re-scheduled in timer")
   end
 
   return ok, err
@@ -633,7 +645,7 @@ end
 local function locking_target(self, ip, port, hostname, fn)
   local key = key_for(self.TARGET_LOCK, ip, port, hostname)
 
-  local ok, err = run_locked(self, key, fn)
+  local ok, err = run_locked(key, self.shm_name, self.LOG_PREFIX, fn)
 
   if ok == "scheduled" then
     self:log(DEBUG, "target function for ", key, " was re-scheduled")
@@ -1643,11 +1655,11 @@ function _M.new(opts)
         end
 
         local cur_time = ngx_now()
-        for _, checker_obj in pairs(hcs) do
 
-          if (last_cleanup_check + CLEANUP_INTERVAL) < cur_time then
-            -- clear targets marked for delayed removal
-            locking_target_list(checker_obj, function(target_list)
+        if (last_cleanup_check + CLEANUP_INTERVAL) < cur_time then
+          locking_target_list(hcs, function(target_list)
+            for _, checker_obj in pairs(hcs) do
+
               local removed_targets = {}
               local index = 1
               while index <= #target_list do
@@ -1673,10 +1685,14 @@ function _M.new(opts)
                   checker_obj:raise_event(checker_obj.events.remove, target.ip, target.port, target.hostname)
                 end
               end
-            end)
 
-            last_cleanup_check = cur_time
-          end
+            end
+          end)
+
+          last_cleanup_check = cur_time
+        end
+
+        for _, checker_obj in pairs(hcs) do
 
           if checker_obj.checks.active.healthy.active and
             (checker_obj.checks.active.healthy.last_run +
@@ -1693,6 +1709,7 @@ function _M.new(opts)
             checker_obj.checks.active.unhealthy.last_run = cur_time
             checker_callback(checker_obj, "unhealthy")
           end
+
         end
       end,
     })
