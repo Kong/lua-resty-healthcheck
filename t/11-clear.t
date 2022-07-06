@@ -202,7 +202,7 @@ unhealthy HTTP increment (3/3) for '(127.0.0.1:21120)'
 
             local checker2 = healthcheck.new(config)
             ngx.say(checker2:get_target_status("127.0.0.1", 10001))
-            ngx.sleep(0.4) -- wait while the targets are cleared
+            ngx.sleep(2.6) -- wait while the targets are cleared
             local status, err = checker2:get_target_status("127.0.0.1", 10001)
             if status ~= nil then
                 ngx.say(status)
@@ -251,7 +251,7 @@ target not found
             local checker2 = healthcheck.new(config)
             checker2:add_target("127.0.0.1", 10002, nil, true)
             ngx.say(checker2:get_target_status("127.0.0.1", 10002))
-            ngx.sleep(0.4) -- wait while the targets would be cleared
+            ngx.sleep(2.6) -- wait while the targets would be cleared
             local status, err = checker2:get_target_status("127.0.0.1", 10001)
             if status ~= nil then
                 ngx.say(status)
