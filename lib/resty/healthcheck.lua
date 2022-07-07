@@ -51,6 +51,9 @@ local new_tab
 local nkeys
 local is_array
 
+
+local TESTING = _G.__TESTING_HEALTHCHECKER or false
+
 do
   local ok
 
@@ -95,7 +98,6 @@ local EMPTY = setmetatable({},{
       error("the EMPTY table is read only, check your code!", 2)
     end
   })
-
 
 --- timer constants
 -- evaluate active checks every 0.1s
@@ -216,6 +218,10 @@ local function key_for(key_prefix, ip, port, hostname)
   return string.format("%s:%s:%s%s", key_prefix, ip, port, hostname and ":" .. hostname or "")
 end
 
+
+-- resty.lock timeout when yieldable
+local LOCK_TIMEOUT = 5
+
 local run_locked
 do
   -- resty_lock is restricted to this scope in order to keep sensitive
@@ -235,25 +241,31 @@ do
     timer   = true,
   }
 
-  local function run_in_timer(premature, fn, ...)
+  local function run_in_timer(premature, self, key, fn, ...)
     if premature then
       return
     end
 
-    return fn(...)
+    local ok, err = run_locked(self, key, fn, ...)
+    if not ok then
+      self:log(ERR, "locked function for key '", key, "' failed in timer: ", err)
+    end
   end
 
-  local function schedule(fn, ...)
-    return ngx.timer.at(0, run_in_timer, fn, ...)
-  end
+  local function schedule(self, key, fn, ...)
+    local ok, err = ngx.timer.at(0, run_in_timer, self, key, fn, ...)
+    if not ok then
+      return nil, "failed scheduling locked function for key '" .. key ..
+                  "', " .. err
+    end
 
-  -- timeout when yieldable
-  local timeout = 5
+    return "scheduled"
+  end
 
   -- resty.lock consumes these options immediately, so this table can be reused
   local opts = {
-    exptime = 10,      -- timeout after which lock is released anyway
-    timeout = timeout, -- max wait time to acquire lock
+    exptime = 10,           -- timeout after which lock is released anyway
+    timeout = LOCK_TIMEOUT, -- max wait time to acquire lock
   }
 
   ---
@@ -291,7 +303,7 @@ do
       local yield = yieldable[get_phase()]
 
       if yield then
-        opts.timeout = timeout
+        opts.timeout = LOCK_TIMEOUT
       else
         -- if yielding is not possible in the current phase, use a zero timeout
         -- so that resty.lock will return `nil, "timeout"` immediately instead of
@@ -310,12 +322,7 @@ do
 
       if not elapsed and err == "timeout" and not yield then
         -- yielding is not possible in the current phase, so retry in a timer
-        local ok, terr = schedule(run_locked, self, key, fn, ...)
-        if not ok then
-          return nil, terr
-        end
-
-        return "scheduled"
+        return schedule(self, key, fn, ...)
 
       elseif not elapsed then
         return nil, "failed acquiring lock for '" .. key .. "', " .. err
@@ -330,7 +337,7 @@ do
     end
 
     if not pok then
-      return nil, perr
+      return nil, "locked function threw an exception: " .. tostring(perr)
     end
 
     return perr, res
@@ -1697,6 +1704,14 @@ function _M.new(opts)
   -- TODO: push entire config in debug level logs
   self:log(DEBUG, "Healthchecker started!")
   return self
+end
+
+
+if TESTING then
+  checker._run_locked = run_locked
+  checker._set_lock_timeout = function(t)
+    LOCK_TIMEOUT = t
+  end
 end
 
 
