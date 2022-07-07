@@ -1,6 +1,6 @@
 # lua-resty-healthcheck
 
-![legacy version](https://img.shields.io/luarocks/v/kong/lua-resty-healthcheck/1.5.1-1?style=flat-square)
+![legacy version](https://img.shields.io/luarocks/v/kong/lua-resty-healthcheck/1.5.2-1?style=flat-square)
 ![Release 1.5.x](https://github.com/Kong/lua-resty-healthcheck/actions/workflows/latest_os.yml/badge.svg?branch=release/1.5.x)
 ![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square)
 ![Twitter Follow](https://img.shields.io/twitter/follow/thekonginc?style=social)
@@ -90,6 +90,18 @@ for the complete API.
 ## History
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
+
+### 1.5.2 (07-Jul-2022)
+
+* Better handling of `resty.lock` failure modes, adding more checks to ensure the
+  lock is held before running critical code, and improving the decision whether a
+  function should be retried after a timeout trying to acquire a lock.
+  [#113](https://github.com/Kong/lua-resty-healthcheck/pull/113)
+* Increased logging for locked function failures.
+  [#114](https://github.com/Kong/lua-resty-healthcheck/pull/114)
+* The cleanup frequency of deleted targets was lowered, cutting the number of
+  created locks in a short period.
+  [#116](https://github.com/Kong/lua-resty-healthcheck/pull/116)
 
 ### 1.5.1 (23-Mar-2022)
 
