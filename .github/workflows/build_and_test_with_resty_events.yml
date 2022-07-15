@@ -21,9 +21,9 @@ jobs:
       - name: Set environment variables
         env:
           OPENRESTY_VER: ${{ matrix.openresty-version }}
-          RESTY_EVENTS_VER: 0.1.0
+          RESTY_EVENTS_VER: 0.1.2
           LUAROCKS_VER: 3.9.0
-          OPENSSL_VER: 1.1.1o
+          OPENSSL_VER: 1.1.1q
           PCRE_VER: 8.45
         run: |
           echo "INSTALL_ROOT=$HOME/install-root" >> $GITHUB_ENV
