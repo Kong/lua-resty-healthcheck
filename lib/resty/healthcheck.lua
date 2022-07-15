@@ -43,7 +43,7 @@ local ssl = require("ngx.ssl")
 local resty_timer = require "resty.timer"
 
 
-local RESTY_EVENTS_VER = "0.1.0"
+local RESTY_EVENTS_VER = [[^0\.1\.\d+$]]
 local RESTY_WORKER_EVENTS_VER = "0.3.3"
 
 
@@ -106,9 +106,8 @@ local function load_events_module(self)
 
   elseif self.events_module == "resty.events" then
     worker_events = require("resty.events.compat")
-    --assert(self.worker_events, "could not load lua-resty-events")
-    assert(worker_events._VERSION == RESTY_EVENTS_VER,
-          "unsupported lua-resty-events version")
+    local version_match = ngx.re.match(worker_events._VERSION, RESTY_EVENTS_VER, "o")
+    assert(version_match, "unsupported lua-resty-events version")
 
   else
     error("unknown events module")
