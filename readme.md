@@ -1,7 +1,7 @@
 # lua-resty-healthcheck
 
-![legacy version](https://img.shields.io/luarocks/v/kong/lua-resty-healthcheck/1.5.1-1?style=flat-square)
-![Release 1.5.x](https://github.com/Kong/lua-resty-healthcheck/actions/workflows/latest_os.yml/badge.svg?branch=release/1.5.x)
+![legacy version](https://img.shields.io/luarocks/v/kong/lua-resty-healthcheck/1.6.1-1?style=flat-square)
+![Release 1.6.x](https://github.com/Kong/lua-resty-healthcheck/actions/workflows/latest_os.yml/badge.svg?branch=release/1.6.x)
 ![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square)
 ![Twitter Follow](https://img.shields.io/twitter/follow/thekonginc?style=social)
 
@@ -91,15 +91,27 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.6.1 (25-Jul-2022)
+
+* Fix: improvements to ensure the proper securing of shared resources to avoid
+  race conditions and clearly report failure states.
+  [#112](https://github.com/Kong/lua-resty-healthcheck/pull/112),
+  [#113](https://github.com/Kong/lua-resty-healthcheck/pull/113),
+  [#114](https://github.com/Kong/lua-resty-healthcheck/pull/114).
+* Fix: reduce the frequency of checking for unused targets, reducing the number
+  of locks created. [#116](https://github.com/Kong/lua-resty-healthcheck/pull/116)
+* Fix accept any [lua-resty-events](https://github.com/Kong/lua-resty-events)
+  `0.1.x` release. [#118](https://github.com/Kong/lua-resty-healthcheck/pull/118)
+
 ### 1.6.0 (27-Jun-2022)
 
-* Introduce support to [lua-resty-events](https://github.com/Kong/lua-resty-events)
+* Feature: introduce support to [lua-resty-events](https://github.com/Kong/lua-resty-events)
   module in addition to [lua-resty-worker-events](https://github.com/Kong/lua-resty-worker-events)
   support. With this addition, the lua-resty-healthcheck luarocks package does
   not require a specific event-sharing module anymore, but you are still
   required to provide either lua-resty-worker-events or lua-resty-events.
   [#105](https://github.com/Kong/lua-resty-healthcheck/pull/105)
-* If available, lua-resty-healthcheck now uses `string.buffer`, the new LuaJIT's
+* Change: if available, lua-resty-healthcheck now uses `string.buffer`, the new LuaJIT's
   serialization API. If it is unavailable, lua-resty-healthcheck fallbacks to
   cjson.  [#109](https://github.com/Kong/lua-resty-healthcheck/pull/109)
 
