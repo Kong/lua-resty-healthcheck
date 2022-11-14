@@ -126,6 +126,24 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
   serialization API. If it is unavailable, lua-resty-healthcheck fallbacks to
   cjson.  [#109](https://github.com/Kong/lua-resty-healthcheck/pull/109)
 
+### 1.5.3 (14-Nov-2022)
+
+* Fix: avoid raising worker events for new targets that were marked for delayed
+  removal, i.e. targets that already exist in memory only need the removal flag
+  cleared when added back. [#121](https://github.com/Kong/lua-resty-healthcheck/pull/121)
+
+### 1.5.2 (07-Jul-2022)
+
+* Better handling of `resty.lock` failure modes, adding more checks to ensure the
+  lock is held before running critical code, and improving the decision whether a
+  function should be retried after a timeout trying to acquire a lock.
+  [#113](https://github.com/Kong/lua-resty-healthcheck/pull/113)
+* Increased logging for locked function failures.
+  [#114](https://github.com/Kong/lua-resty-healthcheck/pull/114)
+* The cleanup frequency of deleted targets was lowered, cutting the number of
+  created locks in a short period.
+  [#116](https://github.com/Kong/lua-resty-healthcheck/pull/116)
+
 ### 1.5.1 (23-Mar-2022)
 
 * Fix: avoid breaking active health checks when adding or removing targets.
