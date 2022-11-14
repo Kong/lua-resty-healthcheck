@@ -468,7 +468,9 @@ function checker:add_target(ip, port, hostname, is_healthy, hostheader)
     end
 
     -- raise event for our newly added target
-    self:raise_event(self.events[internal_health], ip, port, hostname)
+    if not found then
+      self:raise_event(self.events[internal_health], ip, port, hostname)
+    end
 
     return true
   end)
