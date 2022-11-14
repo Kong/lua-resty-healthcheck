@@ -1,6 +1,6 @@
 # lua-resty-healthcheck
 
-![legacy version](https://img.shields.io/luarocks/v/kong/lua-resty-healthcheck/1.5.2-1?style=flat-square)
+![legacy version](https://img.shields.io/luarocks/v/kong/lua-resty-healthcheck/1.5.3-1?style=flat-square)
 ![Release 1.5.x](https://github.com/Kong/lua-resty-healthcheck/actions/workflows/latest_os.yml/badge.svg?branch=release/1.5.x)
 ![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square)
 ![Twitter Follow](https://img.shields.io/twitter/follow/thekonginc?style=social)
@@ -90,6 +90,13 @@ for the complete API.
 ## History
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
+
+### 1.5.3 (14-Nov-2022)
+
+* Fix: avoid raising worker events for new targets that were marked for delayed
+  removal, i.e. targets that already exist in memory only need the removal flag
+  cleared when added back. [#121](https://github.com/Kong/lua-resty-healthcheck/pull/121)
+
 
 ### 1.5.2 (07-Jul-2022)
 
