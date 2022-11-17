@@ -91,6 +91,12 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.6.2 (17-Nov-2022)
+
+* Fix: avoid raising worker events for new targets that were marked for delayed
+  removal, i.e. targets that already exist in memory only need the removal flag
+  cleared when added back. [#122](https://github.com/Kong/lua-resty-healthcheck/pull/122)
+
 ### 1.6.1 (25-Jul-2022)
 
 * Fix: improvements to ensure the proper securing of shared resources to avoid
