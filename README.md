@@ -144,6 +144,36 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 * fix: do not call on the module table, but use a method for locks. Also in
   [#57](https://github.com/Kong/lua-resty-healthcheck/pull/57)
 
+### 1.6.2 (17-Nov-2022)
+
+* Fix: avoid raising worker events for new targets that were marked for delayed
+  removal, i.e. targets that already exist in memory only need the removal flag
+  cleared when added back. [#122](https://github.com/Kong/lua-resty-healthcheck/pull/122)
+
+### 1.6.1 (25-Jul-2022)
+
+* Fix: improvements to ensure the proper securing of shared resources to avoid
+  race conditions and clearly report failure states.
+  [#112](https://github.com/Kong/lua-resty-healthcheck/pull/112),
+  [#113](https://github.com/Kong/lua-resty-healthcheck/pull/113),
+  [#114](https://github.com/Kong/lua-resty-healthcheck/pull/114).
+* Fix: reduce the frequency of checking for unused targets, reducing the number
+  of locks created. [#116](https://github.com/Kong/lua-resty-healthcheck/pull/116)
+* Fix accept any [lua-resty-events](https://github.com/Kong/lua-resty-events)
+  `0.1.x` release. [#118](https://github.com/Kong/lua-resty-healthcheck/pull/118)
+
+### 1.6.0 (27-Jun-2022)
+
+* Feature: introduce support to [lua-resty-events](https://github.com/Kong/lua-resty-events)
+  module in addition to [lua-resty-worker-events](https://github.com/Kong/lua-resty-worker-events)
+  support. With this addition, the lua-resty-healthcheck luarocks package does
+  not require a specific event-sharing module anymore, but you are still
+  required to provide either lua-resty-worker-events or lua-resty-events.
+  [#105](https://github.com/Kong/lua-resty-healthcheck/pull/105)
+* Change: if available, lua-resty-healthcheck now uses `string.buffer`, the new LuaJIT's
+  serialization API. If it is unavailable, lua-resty-healthcheck fallbacks to
+  cjson.  [#109](https://github.com/Kong/lua-resty-healthcheck/pull/109)
+
 ### 1.5.3 (14-Nov-2022)
 
 * Fix: avoid raising worker events for new targets that were marked for delayed
