@@ -8,8 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        openresty-version: [1.17.8.2]
-        luarocks-version: [3.7.0]
+        openresty-version: [1.21.4.1, 1.19.9.1]
+        luarocks-version: [3.8.0]
 
     steps:
       - name: Update and install OS dependencies
@@ -42,7 +42,7 @@ jobs:
           path: |
             ${{ env.INSTALL_PATH }}
             ~/perl5
-          key: ${{ runner.os }}-${{ hashFiles('.github/workflows/latest_os.yml') }}
+          key: ${{ runner.os }}-${{ matrix.openresty-version }}-${{ hashFiles('.github/workflows/latest_os.yml') }}
 
       - name: Create needed paths
         if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -104,8 +104,8 @@ jobs:
     needs: build
     strategy:
       matrix:
-        openresty-version: [1.17.8.2]
-        luarocks-version: [3.7.0]
+        openresty-version: [1.21.4.1, 1.19.9.1]
+        luarocks-version: [3.8.0]
     steps:
       - name: Checkout lua-resty-healthcheck
         uses: actions/checkout@v2
@@ -134,7 +134,7 @@ jobs:
           path: |
             ${{ env.INSTALL_PATH }}
             ~/perl5
-          key: ${{ runner.os }}-${{ hashFiles('.github/workflows/latest_os.yml') }}
+          key: ${{ runner.os }}-${{ matrix.openresty-version }}-${{ hashFiles('.github/workflows/latest_os.yml') }}
 
       - name: Lint code
         run: |
@@ -147,8 +147,8 @@ jobs:
     needs: build
     strategy:
       matrix:
-        openresty-version: [1.17.8.2]
-        luarocks-version: [3.7.0]
+        openresty-version: [1.21.4.1, 1.19.9.1]
+        luarocks-version: [3.8.0]
     steps:
       - name: Checkout lua-resty-healthcheck
         uses: actions/checkout@v2
@@ -177,7 +177,7 @@ jobs:
           path: |
             ${{ env.INSTALL_PATH }}
             ~/perl5
-          key: ${{ runner.os }}-${{ hashFiles('.github/workflows/latest_os.yml') }}
+          key: ${{ runner.os }}-${{ matrix.openresty-version }}-${{ hashFiles('.github/workflows/latest_os.yml') }}
 
       - name: Install lua-resty-healthcheck
         run: luarocks make
