@@ -20,7 +20,7 @@
 -- - Events will be raised in every worker, see [lua-resty-worker-events](https://github.com/Kong/lua-resty-worker-events)
 -- for details.
 --
--- @copyright 2017 Kong Inc.
+-- @copyright 2017-2023 Kong Inc.
 -- @author Hisham Muhammad, Thijs Schreijer
 -- @license Apache 2.0
 
@@ -33,8 +33,6 @@ local ipairs = ipairs
 local table_insert = table.insert
 local table_remove = table.remove
 local string_format = string.format
-local re_find = ngx.re.find
--- local resty_lock = require("resty.lock") -- required later in the file"
 local ssl = require("ngx.ssl")
 local resty_timer = require "resty.timer"
 local bit = require("bit")
