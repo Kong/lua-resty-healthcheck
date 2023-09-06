@@ -26,8 +26,8 @@ jobs:
           OPENSSL_VER: 1.1.1q
           PCRE_VER: 8.45
         run: |
-          echo "INSTALL_ROOT=$HOME/install-root" >> $GITHUB_ENV
-          echo "DOWNLOAD_ROOT=$HOME/download-root" >> $GITHUB_ENV
+          echo "INSTALL_ROOT=/home/runner/work/cache/install-root" >> $GITHUB_ENV
+          echo "DOWNLOAD_ROOT=/home/runner/work/cache/download-root" >> $GITHUB_ENV
           echo "OPENRESTY=$OPENRESTY_VER" >> $GITHUB_ENV
           echo "LUAROCKS=$LUAROCKS_VER" >> $GITHUB_ENV
           echo "OPENSSL=$OPENSSL_VER" >> $GITHUB_ENV
@@ -42,7 +42,9 @@ jobs:
         uses: actions/cache@v3
         id: cache-deps
         with:
-          path: ${{ env.GITHUB_WORKSPACE }}/
+          path: |
+            /home/runner/work/cache/install-root
+            /home/runner/work/cache/download-root
           key: ${{ runner.os }}-${{ hashFiles('**/.github/workflows/build_and_test_with_resty_events.yml') }}-${{ matrix.openresty-version }}
 
       - name: Add to Path
