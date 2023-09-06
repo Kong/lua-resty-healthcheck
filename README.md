@@ -144,6 +144,11 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 * fix: do not call on the module table, but use a method for locks. Also in
   [#57](https://github.com/Kong/lua-resty-healthcheck/pull/57)
 
+### 1.6.3 (06-Sep-2023)
+
+* Feature: Added support for https_sni [#49](https://github.com/Kong/lua-resty-healthcheck/pull/49) (backport)
+* Fix: Use OpenResty API for mTLS [#99](https://github.com/Kong/lua-resty-healthcheck/pull/99) (backport)
+
 ### 1.6.2 (17-Nov-2022)
 
 * Fix: avoid raising worker events for new targets that were marked for delayed
