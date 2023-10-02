@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * (blocks() * 3) - 2;
+plan tests => repeat_each() * (blocks() * 3) - 3;
 
 my $pwd = cwd();
 
@@ -228,3 +228,63 @@ false
 false
 false
 false
+
+=== TEST 8: new() was called multiple times with input which do not have healthy/unhealthy config
+--- http_config eval: $::HttpConfig
+--- config
+    location = /t {
+        content_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+
+            -- CASE 1: default http_statuses should be set correctly when new() was called multiple times
+            local hc1 = healthcheck.new({
+              name = "testing",
+              shm_name = "test_shm",
+              checks = {
+                  active = {
+                      type = "http",
+                  },
+              }
+            })
+            -- make sure checks.active.healthy.http_statuses is filled with defaults
+            ngx.say(hc1.checks.active.healthy.http_statuses[200])
+
+            local hc2 = healthcheck.new({
+              name = "testing",
+              shm_name = "test_shm",
+              checks = {
+                  active = {
+                      type = "http",
+                  },
+              }
+            })
+            -- make sure checks.active.healthy.http_statuses is filled with defaults
+            ngx.say(hc2.checks.active.healthy.http_statuses[200])
+
+            -- CASE 2: the given http_statuses should not be overridden by default
+            local hc3 = healthcheck.new({
+              name = "testing",
+              shm_name = "test_shm",
+              checks = {
+                  active = {
+                      type = "http",
+                      healthy = {
+                          http_statuses = {201}
+                      }
+                  },
+              }
+            })
+            -- make sure defaults won't override the given input
+            ngx.say(hc3.checks.active.healthy.http_statuses[200])
+            ngx.say(hc3.checks.active.healthy.http_statuses[201])
+        }
+    }
+--- request
+GET /t
+--- response_body
+true
+true
+nil
+true
