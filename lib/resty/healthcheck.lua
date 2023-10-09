@@ -32,6 +32,7 @@ local tostring = tostring
 local ipairs = ipairs
 local table_insert = table.insert
 local table_remove = table.remove
+local table_concat = table.concat
 local string_format = string.format
 local ssl = require("ngx.ssl")
 local resty_timer = require "resty.timer"
@@ -918,7 +919,7 @@ function checker:set_all_target_statuses_for_hostname(hostname, port, is_healthy
     end
   end
 
-  return all_ok, #errs > 0 and table.concat(errs, "; ") or nil
+  return all_ok, #errs > 0 and table_concat(errs, "; ") or nil
 end
 
 
@@ -1043,7 +1044,7 @@ function checker:run_single_check(ip, port, hostname, hostheader)
     if headers_length > 0 then
       if is_array(req_headers) then
         self:log(WARN, "array headers is deprecated")
-        headers = table.concat(req_headers, "\r\n")
+        headers = table_concat(req_headers, "\r\n")
       else
         headers = new_tab(0, headers_length)
         local idx = 0
@@ -1058,7 +1059,7 @@ function checker:run_single_check(ip, port, hostname, hostheader)
               headers[idx] = key .. ": " .. tostring(values)
             end
         end
-        headers = table.concat(headers, "\r\n")
+        headers = table_concat(headers, "\r\n")
       end
       if #headers > 0 then
         headers = headers .. "\r\n"
@@ -1384,7 +1385,7 @@ local MAXNUM = 2^31 - 1
 
 local function fail(ctx, k, msg)
   ctx[#ctx + 1] = k
-  error(table.concat(ctx, ".") .. ": " .. msg, #ctx + 1)
+  error(table_concat(ctx, ".") .. ": " .. msg, #ctx + 1)
 end
 
 
