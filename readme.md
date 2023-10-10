@@ -1,3 +1,5 @@
+a test
+
 # lua-resty-healthcheck
 
 ![legacy version](https://img.shields.io/luarocks/v/kong/lua-resty-healthcheck/1.6.1-1?style=flat-square)
