@@ -1,6 +1,12 @@
-name: Build and test
+name: Build and test - with worker_events
 
-on: [push, pull_request]
+on:
+  pull_request: {}
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+      - master
 
 jobs:
   build:
