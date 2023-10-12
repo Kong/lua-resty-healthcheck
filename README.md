@@ -102,6 +102,14 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 * push commit and tag
 * upload rock to luarocks: `luarocks upload rockspecs/[name] --api-key=abc`
 
+### 3.0.0
+* fix: properly log line numbers by using tail calls
+
+### 2.0.0
+Version 2.0.0 turned out to introduce to many breaking changes and it was developped
+further since September 2020. Some of the non-breaking fixes were ported to version 3.0.0
+In order to see changes from version 2.0.0 please see this tag: [v2.0.0](https://github.com/Kong/lua-resty-healthcheck/tree/2.0.0)
+
 ### 1.6.3 (06-Sep-2023)
 
 * Feature: Added support for https_sni [#49](https://github.com/Kong/lua-resty-healthcheck/pull/49) (backport)

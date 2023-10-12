@@ -1328,7 +1328,7 @@ end
 -- Log a message specific to this checker
 -- @param level standard ngx log level constant
 function checker:log(level, ...)
-  ngx_log(level, worker_color(self.LOG_PREFIX), ...)
+  return ngx_log(level, self.LOG_PREFIX, ...)
 end
 
 
@@ -1620,7 +1620,7 @@ function _M.new(opts)
   self.PERIODIC_LOCK    = SHM_PREFIX .. ":period_lock:"
   -- prepare constants
   self.EVENT_SOURCE     = EVENT_SOURCE_PREFIX .. " [" .. self.name .. "]"
-  self.LOG_PREFIX       = LOG_PREFIX .. "(" .. self.name .. ") "
+  self.LOG_PREFIX       = worker_color(LOG_PREFIX .. "(" .. self.name .. ") ")
 
   -- register for events, and directly after load initial target list
   -- order is important!
