@@ -1,6 +1,17 @@
-name: Build and test
+name: Build and test - with worker_events
 
-on: [push, pull_request]
+concurrency:
+  # for PR's cancel the running task, if another commit is pushed
+  group: ${{ github.workflow }} ${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  pull_request: {}
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+      - master
 
 jobs:
   build:

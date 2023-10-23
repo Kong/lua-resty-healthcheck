@@ -1,0 +1,36 @@
+name: SAST
+
+concurrency:
+  # for PR's cancel the running task, if another commit is pushed
+  group: ${{ github.workflow }} ${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+on:
+  pull_request:
+    paths:
+      - lib/**.lua
+  push:
+    branches:
+    - master
+    - main
+    paths:
+      - lib/**.lua
+  workflow_dispatch: {}
+
+
+jobs:
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    permissions:
+      # required for all workflows
+      security-events: write
+      # only required for workflows in private repositories
+      actions: read
+      contents: read
+
+    if: (github.actor != 'dependabot[bot]')
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: Kong/public-shared-actions/security-actions/semgrep@c03e30a36e8a2dde5cbd463229a96aaad7ccad24

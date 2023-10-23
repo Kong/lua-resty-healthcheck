@@ -91,6 +91,25 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### Releasing new versions:
+
+* update changelog below (PR's should be merged including a changelog entry)
+* based on changelog determine new SemVer version
+* create a new rockspec
+* render the docs using `ldoc` (don't do this within PR's)
+* commit as "release x.x.x" (do not include rockspec revision)
+* tag the commit with "x.x.x" (do not include rockspec revision)
+* push commit and tag
+* upload rock to luarocks: `luarocks upload rockspecs/[name] --api-key=abc`
+
+### 3.0.0 (12-Oct-2023)
+
+* Perf: optimize by localizing some functions [#92](https://github.com/Kong/lua-resty-healthcheck/pull/92) (backport)
+* Fix: Generate fresh default http_statuses within new() [#83](https://github.com/Kong/lua-resty-healthcheck/pull/83) (backport)
+
+### 2.0.0
+--- Version discarded from current & future development
+
 ### 1.6.3 (06-Sep-2023)
 
 * Feature: Added support for https_sni [#49](https://github.com/Kong/lua-resty-healthcheck/pull/49) (backport)
@@ -125,6 +144,24 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 * Change: if available, lua-resty-healthcheck now uses `string.buffer`, the new LuaJIT's
   serialization API. If it is unavailable, lua-resty-healthcheck fallbacks to
   cjson.  [#109](https://github.com/Kong/lua-resty-healthcheck/pull/109)
+
+### 1.5.3 (14-Nov-2022)
+
+* Fix: avoid raising worker events for new targets that were marked for delayed
+  removal, i.e. targets that already exist in memory only need the removal flag
+  cleared when added back. [#121](https://github.com/Kong/lua-resty-healthcheck/pull/121)
+
+### 1.5.2 (07-Jul-2022)
+
+* Better handling of `resty.lock` failure modes, adding more checks to ensure the
+  lock is held before running critical code, and improving the decision whether a
+  function should be retried after a timeout trying to acquire a lock.
+  [#113](https://github.com/Kong/lua-resty-healthcheck/pull/113)
+* Increased logging for locked function failures.
+  [#114](https://github.com/Kong/lua-resty-healthcheck/pull/114)
+* The cleanup frequency of deleted targets was lowered, cutting the number of
+  created locks in a short period.
+  [#116](https://github.com/Kong/lua-resty-healthcheck/pull/116)
 
 ### 1.5.1 (23-Mar-2022)
 

@@ -32,6 +32,7 @@ local tostring = tostring
 local ipairs = ipairs
 local table_insert = table.insert
 local table_remove = table.remove
+local table_concat = table.concat
 local string_format = string.format
 local ssl = require("ngx.ssl")
 local resty_timer = require "resty.timer"
@@ -918,7 +919,7 @@ function checker:set_all_target_statuses_for_hostname(hostname, port, is_healthy
     end
   end
 
-  return all_ok, #errs > 0 and table.concat(errs, "; ") or nil
+  return all_ok, #errs > 0 and table_concat(errs, "; ") or nil
 end
 
 
@@ -1043,7 +1044,7 @@ function checker:run_single_check(ip, port, hostname, hostheader)
     if headers_length > 0 then
       if is_array(req_headers) then
         self:log(WARN, "array headers is deprecated")
-        headers = table.concat(req_headers, "\r\n")
+        headers = table_concat(req_headers, "\r\n")
       else
         headers = new_tab(0, headers_length)
         local idx = 0
@@ -1058,7 +1059,7 @@ function checker:run_single_check(ip, port, hostname, hostheader)
               headers[idx] = key .. ": " .. tostring(values)
             end
         end
-        headers = table.concat(headers, "\r\n")
+        headers = table_concat(headers, "\r\n")
       end
       if #headers > 0 then
         headers = headers .. "\r\n"
@@ -1384,7 +1385,7 @@ local MAXNUM = 2^31 - 1
 
 local function fail(ctx, k, msg)
   ctx[#ctx + 1] = k
-  error(table.concat(ctx, ".") .. ": " .. msg, #ctx + 1)
+  error(table_concat(ctx, ".") .. ": " .. msg, #ctx + 1)
 end
 
 
@@ -1425,51 +1426,52 @@ local function fill_in_settings(opts, defaults, ctx)
 end
 
 
-local defaults = {
-  name = NO_DEFAULT,
-  shm_name = NO_DEFAULT,
-  type = NO_DEFAULT,
-  events_module = "resty.worker.events",
-  checks = {
-    active = {
-      type = "http",
-      timeout = 1,
-      concurrency = 10,
-      http_path = "/",
-      https_sni = NO_DEFAULT,
-      https_verify_certificate = true,
-      headers = {""},
-      healthy = {
-        interval = 0, -- 0 = disabled by default
-        http_statuses = { 200, 302 },
-        successes = 2,
+local function get_defaults()
+  return {
+    name = NO_DEFAULT,
+    shm_name = NO_DEFAULT,
+    type = NO_DEFAULT,
+    events_module = "resty.worker.events",
+    checks = {
+      active = {
+        type = "http",
+        timeout = 1,
+        concurrency = 10,
+        http_path = "/",
+        https_sni = NO_DEFAULT,
+        https_verify_certificate = true,
+        headers = {""},
+        healthy = {
+          interval = 0, -- 0 = disabled by default
+          http_statuses = { 200, 302 },
+          successes = 2,
+        },
+        unhealthy = {
+          interval = 0, -- 0 = disabled by default
+          http_statuses = { 429, 404,
+                            500, 501, 502, 503, 504, 505 },
+          tcp_failures = 2,
+          timeouts = 3,
+          http_failures = 5,
+        },
       },
-      unhealthy = {
-        interval = 0, -- 0 = disabled by default
-        http_statuses = { 429, 404,
-                          500, 501, 502, 503, 504, 505 },
-        tcp_failures = 2,
-        timeouts = 3,
-        http_failures = 5,
+      passive = {
+        type = "http",
+        healthy = {
+          http_statuses = { 200, 201, 202, 203, 204, 205, 206, 207, 208, 226,
+                            300, 301, 302, 303, 304, 305, 306, 307, 308 },
+          successes = 5,
+        },
+        unhealthy = {
+          http_statuses = { 429, 500, 503 },
+          tcp_failures = 2,
+          timeouts = 7,
+          http_failures = 5,
+        },
       },
     },
-    passive = {
-      type = "http",
-      healthy = {
-        http_statuses = { 200, 201, 202, 203, 204, 205, 206, 207, 208, 226,
-                          300, 301, 302, 303, 304, 305, 306, 307, 308 },
-        successes = 5,
-      },
-      unhealthy = {
-        http_statuses = { 429, 500, 503 },
-        tcp_failures = 2,
-        timeouts = 7,
-        http_failures = 5,
-      },
-    },
-  },
-}
-
+  }
+end
 
 local function to_set(tbl, key)
   local set = {}
@@ -1539,6 +1541,8 @@ function _M.new(opts)
   local active_type = (((opts or EMPTY).checks or EMPTY).active or EMPTY).type
   local passive_type = (((opts or EMPTY).checks or EMPTY).passive or EMPTY).type
 
+  -- create a new defaults table within new() as defaults table will be modified by to_set function later
+  local defaults = get_defaults()
   local self = fill_in_settings(opts, defaults)
 
   load_events_module(self)
