@@ -40,9 +40,9 @@ qq{
             local checker = healthcheck.new({
                 name = "testing",
                 shm_name = "test_shm",
+                type = "http",
                 checks = {
                     active = {
-                        type = "http",
                         http_path = "/status",
                         healthy  = {
                             interval = 999, -- we don't want active checks
@@ -55,7 +55,6 @@ qq{
                         }
                     },
                     passive = {
-                        type = "http",
                         healthy  = {
                             successes = 3,
                         },
@@ -69,14 +68,12 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2117, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
-            we.poll()
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
-            we.poll()
             ngx.say(checker:get_target_status("127.0.0.1", 2117, nil))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2113, nil))  -- false
         }
@@ -120,9 +117,9 @@ qq{
             local checker = healthcheck.new({
                 name = "testing",
                 shm_name = "test_shm",
+                type = "tcp",
                 checks = {
                     active = {
-                        type = "tcp",
                         http_path = "/status",
                         healthy  = {
                             interval = 999, -- we don't want active checks
@@ -135,7 +132,6 @@ qq{
                         }
                     },
                     passive = {
-                        type = "tcp",
                         healthy  = {
                             successes = 3,
                         },
@@ -149,14 +145,12 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2117, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
-            we.poll()
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
-            we.poll()
             ngx.say(checker:get_target_status("127.0.0.1", 2117, nil))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2113, nil))  -- false
         }
@@ -198,9 +192,9 @@ qq{
             local checker = healthcheck.new({
                 name = "testing",
                 shm_name = "test_shm",
+                type = "tcp",
                 checks = {
                     active = {
-                        type = "tcp",
                         http_path = "/status",
                         healthy  = {
                             interval = 999, -- we don't want active checks
@@ -213,7 +207,6 @@ qq{
                         }
                     },
                     passive = {
-                        type = "tcp",
                         healthy  = {
                             successes = 3,
                         },
@@ -227,14 +220,12 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2117, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
-            we.poll()
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
             checker:report_failure("127.0.0.1", 2117, nil, "active")
             checker:report_failure("127.0.0.1", 2113, nil, "passive")
-            we.poll()
             ngx.say(checker:get_target_status("127.0.0.1", 2117, nil))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2113, nil))  -- true
         }

@@ -43,10 +43,7 @@ __DATA__
             ngx.sleep(0.2) -- wait twice the interval
             local ok, err = checker:start()
             ngx.say(ok)
-            ngx.say(
-                (checker.active_healthy_timer and 1 or 0) +
-                (checker.active_unhealthy_timer and 1 or 0)
-            )
+            ngx.say(checker.timer_count)
         }
     }
 --- request
@@ -86,7 +83,7 @@ true
 --- request
 GET /t
 --- response_body
-cannot start, timers are still running
+cannot start, 2 (of 2) timers are still running
 --- no_error_log
 [error]
 
@@ -118,10 +115,7 @@ cannot start, timers are still running
             ngx.say(ok)
             local ok, err = checker:start()
             ngx.say(ok)
-            ngx.say(
-                (checker.active_healthy_timer and 1 or 0) +
-                (checker.active_unhealthy_timer and 1 or 0)
-            )
+            ngx.say(checker.timer_count)
         }
     }
 --- request
@@ -158,17 +152,16 @@ true
             })
             local ok, err = checker:stop()
             ngx.say(ok)
+            ngx.say(checker.timer_count)
             ngx.sleep(0.2) -- wait twice the interval
-            ngx.say(
-                (checker.active_healthy_timer and 1 or 0) +
-                (checker.active_unhealthy_timer and 1 or 0)
-            )
+            ngx.say(checker.timer_count)
         }
     }
 --- request
 GET /t
 --- response_body
 true
+2
 0
 --- no_error_log
 [error]
@@ -198,17 +191,12 @@ checking
             })
             local ok, err = checker:stop()
             ngx.say(ok)
+            ngx.say(checker.timer_count)
             ngx.sleep(0.2) -- wait twice the interval
-            ngx.say(
-                (checker.active_healthy_timer and 1 or 0) +
-                (checker.active_unhealthy_timer and 1 or 0)
-            )
+            ngx.say(checker.timer_count)
             local ok, err = checker:start()
             ngx.say(ok)
-            ngx.say(
-                (checker.active_healthy_timer and 1 or 0) +
-                (checker.active_unhealthy_timer and 1 or 0)
-            )
+            ngx.say(checker.timer_count)
             ngx.sleep(0.2) -- wait twice the interval
         }
     }
@@ -216,6 +204,7 @@ checking
 GET /t
 --- response_body
 true
+2
 0
 true
 2

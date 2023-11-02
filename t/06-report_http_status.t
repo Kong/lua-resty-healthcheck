@@ -68,14 +68,12 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
-            we.poll()
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 500, "passive")
-            we.poll()
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- false
             ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- false
         }
@@ -148,7 +146,6 @@ qq{
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, false)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, false)
-            we.poll()
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
@@ -157,7 +154,6 @@ qq{
             checker:report_http_status("127.0.0.1", 2113, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2113, nil, 200, "passive")
-            we.poll()
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- true
             ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- true
         }
@@ -230,12 +226,10 @@ qq{
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, false)
-            we.poll()
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "passive")
-            we.poll()
             ngx.say(checker:get_target_status("127.0.0.1", 2119, nil))  -- false
         }
     }
@@ -299,12 +293,10 @@ qq{
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, false)
-            we.poll()
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 200, "active")
-            we.poll()
             ngx.say(checker:get_target_status("127.0.0.1", 2119, nil))  -- false
         }
     }
@@ -368,12 +360,10 @@ qq{
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
-            we.poll()
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
-            we.poll()
             ngx.say(checker:get_target_status("127.0.0.1", 2119))  -- true
         }
     }
@@ -437,12 +427,10 @@ qq{
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
-            we.poll()
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "active")
-            we.poll()
             ngx.say(checker:get_target_status("127.0.0.1", 2119, nil))  -- true
         }
     }
@@ -489,7 +477,6 @@ qq{
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2119, nil, true)
-            we.poll()
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")
             checker:report_http_status("127.0.0.1", 2119, nil, 500, "passive")

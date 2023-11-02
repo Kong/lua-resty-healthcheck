@@ -26,12 +26,14 @@
 <br/>
 <h1>lua-resty-healthcheck</h1>
 
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
 
 <h2>Contents</h2>
 <ul>
 <li><a href="#Synopsis">Synopsis </a></li>
 <li><a href="#Description">Description </a></li>
-<li><a href="#Async_behaviour">Async behaviour </a></li>
 <li><a href="#History">History </a></li>
 <li><a href="#Copyright_and_License">Copyright and License </a></li>
 </ul>
@@ -39,11 +41,12 @@
 
 <h2>Topics</h2>
 <ul class="">
-  <li><strong>README</strong></li>
+  <li><strong>readme</strong></li>
 </ul>
 <h2>Modules</h2>
 <ul class="nowrap">
-  <li><a href="../index.html">resty.healthcheck</a></li>
+  <li><a href="../modules/resty.healthcheck.html">resty.healthcheck</a></li>
+  <li><a href="../modules/resty.healthcheck.utils.html">resty.healthcheck.utils</a></li>
 </ul>
 
 </div>
@@ -141,67 +144,10 @@ programmatic API using functions such as <code>checker:report_http_status(host, 
 <p>See the <a href="http://kong.github.io/lua-resty-healthcheck">online LDoc documentation</a>
 for the complete API.</p>
 
-<p><a name="Async_behaviour"></a></p>
-<h2>Async behaviour</h2>
-
-<p>Since this library heavily uses the SHM to share data between workers, it must
-use locks. The locks themselves need access to <code>ngx.sleep</code> which is not available
-in all contexts. Most notably not during startup; <code>init</code> and <code>init_worker</code>.</p>
-
-<p>The library will try and acquire the lock and update, but if it fails it will
-schedule an async update (timer with delay 0).</p>
-
-<p>One workaround for this in the initial phases would be to replace <code>ngx.sleep</code> with
-a version that does a blocking sleep in <code>init</code>/<code>init_worker</code>. This will enable
-the usage of locks in those phases.</p>
-
-
 <p><a name="History"></a></p>
 <h2>History</h2>
 
 <p>Versioning is strictly based on <a href="https://semver.org/">Semantic Versioning</a></p>
-
-<h3>Releasing new versions:</h3>
-
-<ul>
-    <li>update changelog below (PR's should be merged including a changelog entry)</li>
-    <li>based on changelog determine new SemVer version</li>
-    <li>create a new rockspec</li>
-    <li>render the docs using <code>ldoc</code> (don't do this within PR's)</li>
-    <li>commit as "release x.x.x" (do not include rockspec revision)</li>
-    <li>tag the commit with "x.x.x" (do not include rockspec revision)</li>
-    <li>push commit and tag</li>
-    <li>upload rock to luarocks: <code>luarocks upload rockspecs/[name] --api-key=abc</code></li>
-</ul>
-
-<h3>2.0.0 (22-Sep-2020)</h3>
-
-<ul>
-    <li>BREAKING: fallback for deprecated top-level field <a href="https://www.lua.org/manual/5.1/manual.html#pdf-type">type</a> is now removed
-    (deprecated since <code>0.5.0</code>) <a href="https://github.com/Kong/lua-resty-healthcheck/pull/56">#56</a></li>
-    <li>BREAKING: Bump <code>lua-resty-worker-events</code> dependency to <code>2.0.0</code>. This makes
-    a lot of the APIs in this library asynchronous as the worker events <code>post</code>
-    and <code>post_local</code> won't anymore call <code>poll</code> on a running worker automatically,
-    for more information, see:
-    https://github.com/Kong/lua-resty-worker-events#200-16-september-2020</li>
-    <li>BREAKING: tcp<em>failures can no longer be 0 on http(s) checks (unless http(s)</em>failures
-    are also set to 0) <a href="https://github.com/Kong/lua-resty-healthcheck/pull/55">#55</a></li>
-    <li>feature: Added support for https_sni <a href="https://github.com/Kong/lua-resty-healthcheck/pull/49">#49</a></li>
-    <li>fix: properly log line numbers by using tail calls <a href="https://github.com/Kong/lua-resty-healthcheck/pull/29">#29</a></li>
-    <li>fix: when not providing a hostname, use IP <a href="https://github.com/Kong/lua-resty-healthcheck/pull/48">#48</a></li>
-    <li>fix: makefile; make install</li>
-    <li>feature: added a status version field <a href="https://github.com/Kong/lua-resty-healthcheck/pull/54">#54</a></li>
-    <li>feature: add headers for probe request <a href="https://github.com/Kong/lua-resty-healthcheck/pull/54">#54</a></li>
-    <li>fix: exit early when reloading during a probe <a href="https://github.com/Kong/lua-resty-healthcheck/pull/47">#47</a></li>
-    <li>fix: prevent target-list from being nil, due to async behaviour <a href="https://github.com/Kong/lua-resty-healthcheck/pull/44">#44</a></li>
-    <li>fix: replace timer and node-wide locks with resty-timer, to prevent interval
-    skips <a href="https://github.com/Kong/lua-resty-healthcheck/pull/59">#59</a></li>
-    <li>change: added additional logging on posting events <a href="https://github.com/Kong/lua-resty-healthcheck/issues/25">#25</a></li>
-    <li>fix: do not run out of timers during init/init_worker when adding a vast
-    amount of targets <a href="https://github.com/Kong/lua-resty-healthcheck/pull/57">#57</a></li>
-    <li>fix: do not call on the module table, but use a method for locks. Also in
-    <a href="https://github.com/Kong/lua-resty-healthcheck/pull/57">#57</a></li>
-</ul>
 
 <h3>1.3.0 (17-Jun-2020)</h3>
 
@@ -215,7 +161,7 @@ the usage of locks in those phases.</p>
 <h3>1.2.0 (13-Feb-2020)</h3>
 
 <ul>
-    <li>Adds <a href="../index.html#checker:set_all_target_statuses_for_hostname">set_all_target_statuses_for_hostname</a>, which sets the targets for
+    <li>Adds <code>set_all_target_statuses_for_hostname</code>, which sets the targets for
     all entries with a given hostname at once.</li>
 </ul>
 
@@ -277,7 +223,7 @@ the usage of locks in those phases.</p>
 <ul>
     <li>Add support for <code>https</code> -- thanks @gaetanfl for the PR!</li>
     <li>Introduce separate <code>checks.active.type</code> and <code>checks.passive.type</code> fields;
-    the top-level <a href="https://www.lua.org/manual/5.1/manual.html#pdf-type">type</a> field is still supported as a fallback but is now
+    the top-level <a href="https://www.lua.org/manual/5.3/manual.html#pdf-type">type</a> field is still supported as a fallback but is now
     deprecated.</li>
 </ul>
 
@@ -309,7 +255,7 @@ the usage of locks in those phases.</p>
 <h3>0.2.0 (30-Nov-2017)</h3>
 
 <ul>
-    <li>Adds <a href="../index.html#checker:set_target_status">set_target_status</a></li>
+    <li>Adds <code>set_target_status</code></li>
 </ul>
 
 <h3>0.1.0 (27-Nov-2017) Initial release</h3>
@@ -321,7 +267,7 @@ the usage of locks in those phases.</p>
 <p><a name="Copyright_and_License"></a></p>
 <h2>Copyright and License</h2>
 
-<pre><code> Copyright 2017-2020 Kong Inc.
+<pre><code> Copyright 2017-2019 Kong Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -343,7 +289,7 @@ the usage of locks in those phases.</p>
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.6</a></i>
-<i style="float:right;">Last updated 2020-09-22 15:00:30 </i>
+<i style="float:right;">Last updated 2020-06-17 13:10:48 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
