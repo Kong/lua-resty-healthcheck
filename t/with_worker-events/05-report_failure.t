@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * 22;
+plan tests => repeat_each() * 26;
 
 my $pwd = cwd();
 
@@ -19,13 +19,13 @@ __DATA__
 
 
 
-=== TEST 1: report_timeout() active + passive
+=== TEST 1: report_failure() fails HTTP active + passive
 --- http_config eval
 qq{
     $::HttpConfig
 
     server {
-        listen 2122;
+        listen 2117;
         location = /status {
             return 200;
         }
@@ -50,9 +50,8 @@ qq{
                         },
                         unhealthy  = {
                             interval = 999, -- we don't want active checks
-                            tcp_failures = 3,
-                            http_failures = 5,
-                            timeouts = 2,
+                            tcp_failures = 2,
+                            http_failures = 3,
                         }
                     },
                     passive = {
@@ -60,22 +59,23 @@ qq{
                             successes = 3,
                         },
                         unhealthy  = {
-                            tcp_failures = 3,
-                            http_failures = 5,
-                            timeouts = 2,
+                            tcp_failures = 2,
+                            http_failures = 3,
                         }
                     }
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2122, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2117, nil, true)
             local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
-            checker:report_timeout("127.0.0.1", 2122, nil, "active")
-            checker:report_timeout("127.0.0.1", 2113, nil, "passive")
-            checker:report_timeout("127.0.0.1", 2122, nil, "active")
-            checker:report_timeout("127.0.0.1", 2113, nil, "passive")
-            ngx.say(checker:get_target_status("127.0.0.1", 2122))  -- false
-            ngx.say(checker:get_target_status("127.0.0.1", 2113))  -- false
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2117, nil))  -- false
+            ngx.say(checker:get_target_status("127.0.0.1", 2113, nil))  -- false
         }
     }
 --- request
@@ -84,23 +84,23 @@ GET /t
 false
 false
 --- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
-unhealthy TIMEOUT increment (1/2) for '(127.0.0.1:2122)'
-unhealthy TIMEOUT increment (2/2) for '(127.0.0.1:2122)'
-event: target status '(127.0.0.1:2122)' from 'true' to 'false'
-unhealthy TIMEOUT increment (1/2) for '(127.0.0.1:2113)'
-unhealthy TIMEOUT increment (2/2) for '(127.0.0.1:2113)'
+unhealthy HTTP increment (1/3) for '(127.0.0.1:2117)'
+unhealthy HTTP increment (2/3) for '(127.0.0.1:2117)'
+unhealthy HTTP increment (3/3) for '(127.0.0.1:2117)'
+event: target status '(127.0.0.1:2117)' from 'true' to 'false'
+unhealthy HTTP increment (1/3) for '(127.0.0.1:2113)'
+unhealthy HTTP increment (2/3) for '(127.0.0.1:2113)'
+unhealthy HTTP increment (3/3) for '(127.0.0.1:2113)'
 event: target status '(127.0.0.1:2113)' from 'true' to 'false'
 
 
-=== TEST 2: report_timeout() for active is a nop when active.unhealthy.timeouts == 0
+=== TEST 2: report_failure() fails TCP active + passive
 --- http_config eval
 qq{
     $::HttpConfig
 
     server {
-        listen 2122;
+        listen 2117;
         location = /status {
             return 200;
         }
@@ -115,7 +115,7 @@ qq{
             local checker = healthcheck.new({
                 name = "testing",
                 shm_name = "test_shm",
-                type = "http",
+                type = "tcp",
                 checks = {
                     active = {
                         http_path = "/status",
@@ -125,9 +125,8 @@ qq{
                         },
                         unhealthy  = {
                             interval = 999, -- we don't want active checks
-                            tcp_failures = 3,
-                            http_failures = 5,
-                            timeouts = 0,
+                            tcp_failures = 2,
+                            http_failures = 3,
                         }
                     },
                     passive = {
@@ -135,41 +134,46 @@ qq{
                             successes = 3,
                         },
                         unhealthy  = {
-                            tcp_failures = 3,
-                            http_failures = 5,
-                            timeouts = 2,
+                            tcp_failures = 2,
+                            http_failures = 3,
                         }
                     }
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2122, nil, true)
-            checker:report_timeout("127.0.0.1", 2122, nil, "active")
-            checker:report_timeout("127.0.0.1", 2122, nil, "active")
-            checker:report_timeout("127.0.0.1", 2122, nil, "active")
-            ngx.say(checker:get_target_status("127.0.0.1", 2122))  -- true
+            local ok, err = checker:add_target("127.0.0.1", 2117, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2117, nil))  -- false
+            ngx.say(checker:get_target_status("127.0.0.1", 2113, nil))  -- false
         }
     }
 --- request
 GET /t
 --- response_body
-true
+false
+false
 --- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
---- no_error_log
-unhealthy TCP increment
-event: target status '(127.0.0.1:2122)' from 'true' to 'false'
+unhealthy TCP increment (1/2) for '(127.0.0.1:2117)'
+unhealthy TCP increment (2/2) for '(127.0.0.1:2117)'
+event: target status '(127.0.0.1:2117)' from 'true' to 'false'
+unhealthy TCP increment (1/2) for '(127.0.0.1:2113)'
+unhealthy TCP increment (2/2) for '(127.0.0.1:2113)'
+event: target status '(127.0.0.1:2113)' from 'true' to 'false'
 
 
-
-=== TEST 3: report_timeout() for passive is a nop when passive.unhealthy.timeouts == 0
+=== TEST 3: report_failure() is a nop when failure counters == 0
 --- http_config eval
 qq{
     $::HttpConfig
 
     server {
-        listen 2122;
+        listen 2117;
         location = /status {
             return 200;
         }
@@ -184,7 +188,7 @@ qq{
             local checker = healthcheck.new({
                 name = "testing",
                 shm_name = "test_shm",
-                type = "http",
+                type = "tcp",
                 checks = {
                     active = {
                         http_path = "/status",
@@ -194,9 +198,8 @@ qq{
                         },
                         unhealthy  = {
                             interval = 999, -- we don't want active checks
-                            tcp_failures = 3,
-                            http_failures = 5,
-                            timeouts = 2,
+                            tcp_failures = 0,
+                            http_failures = 0,
                         }
                     },
                     passive = {
@@ -204,28 +207,34 @@ qq{
                             successes = 3,
                         },
                         unhealthy  = {
-                            tcp_failures = 3,
-                            http_failures = 5,
-                            timeouts = 0,
+                            tcp_failures = 0,
+                            http_failures = 0,
                         }
                     }
                 }
             })
             ngx.sleep(0.1) -- wait for initial timers to run once
-            local ok, err = checker:add_target("127.0.0.1", 2122, nil, true)
-            checker:report_timeout("127.0.0.1", 2122, nil, "passive")
-            checker:report_timeout("127.0.0.1", 2122, nil, "passive")
-            checker:report_timeout("127.0.0.1", 2122, nil, "passive")
-            ngx.say(checker:get_target_status("127.0.0.1", 2122))  -- true
+            local ok, err = checker:add_target("127.0.0.1", 2117, nil, true)
+            local ok, err = checker:add_target("127.0.0.1", 2113, nil, true)
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            checker:report_failure("127.0.0.1", 2117, nil, "active")
+            checker:report_failure("127.0.0.1", 2113, nil, "passive")
+            ngx.say(checker:get_target_status("127.0.0.1", 2117, nil))  -- true
+            ngx.say(checker:get_target_status("127.0.0.1", 2113, nil))  -- true
         }
     }
 --- request
 GET /t
 --- response_body
 true
---- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
+true
 --- no_error_log
-unhealthy TCP increment
-event: target status '(127.0.0.1:2122)' from 'true' to 'false'
+unhealthy TCP increment (1/2) for '(127.0.0.1:2117)'
+unhealthy TCP increment (2/2) for '(127.0.0.1:2117)'
+event: target status '(127.0.0.1:2117)' from 'true' to 'false'
+unhealthy TCP increment (1/2) for '(127.0.0.1:2113)'
+unhealthy TCP increment (2/2) for '(127.0.0.1:2113)'
+event: target status '(127.0.0.1:2113)' from 'true' to 'false'

@@ -1,7 +1,8 @@
 package = "lua-resty-healthcheck"
-version = "scm-1"
+version = "1.6.2-1"
 source = {
-  url = "git://github.com/Kong/lua-resty-healthcheck",
+  url = "https://github.com/Kong/lua-resty-healthcheck/archive/1.6.2.tar.gz",
+  dir = "lua-resty-healthcheck-1.6.2"
 }
 description = {
   summary = "Healthchecks for OpenResty to check upstream service status",

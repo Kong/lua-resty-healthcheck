@@ -6,11 +6,22 @@ workers(1);
 plan tests => repeat_each() * (blocks() * 3) - 2;
 
 my $pwd = cwd();
+$ENV{TEST_NGINX_SERVROOT} = server_root();
 
 our $HttpConfig = qq{
     lua_package_path "$pwd/lib/?.lua;;";
     lua_shared_dict test_shm 8m;
-    lua_shared_dict my_worker_events 8m;
+
+    server {
+        server_name kong_worker_events;
+        listen unix:$ENV{TEST_NGINX_SERVROOT}/worker_events.sock;
+        access_log off;
+        location / {
+            content_by_lua_block {
+                require("resty.events.compat").run()
+            }
+        }
+    }
 };
 
 run_tests();
@@ -23,7 +34,9 @@ __DATA__
     location = /t {
         content_by_lua_block {
             local healthcheck = require("resty.healthcheck")
-            local ok, err = pcall(healthcheck.new)
+            local ok, err = pcall(healthcheck.new, {
+                events_module = "resty.events",
+            })
             ngx.log(ngx.ERR, err)
         }
     }
@@ -39,10 +52,11 @@ please configure
 --- config
     location = /t {
         content_by_lua_block {
-            local we = require "resty.worker.events"
-            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local we = require "resty.events.compat"
+            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
             local healthcheck = require("resty.healthcheck")
             local ok, err = pcall(healthcheck.new, {
+                events_module = "resty.events",
                 shm_name = "test_shm",
             })
             ngx.log(ngx.ERR, err)
@@ -55,38 +69,18 @@ GET /t
 --- error_log
 required option 'name' is missing
 
-=== TEST 3: new() requires 'shm_name'
+=== TEST 3: new() fails with invalid shm
 --- http_config eval: $::HttpConfig
 --- config
     location = /t {
         content_by_lua_block {
-            local we = require "resty.worker.events"
-            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
-            local healthcheck = require("resty.healthcheck")
-            local ok, err = pcall(healthcheck.new, {
-                name = "testing",
-            })
-            ngx.log(ngx.ERR, err)
-        }
-    }
---- request
-GET /t
---- response_body
-
---- error_log
-required option 'shm_name' is missing
-
-=== TEST 4: new() fails with invalid shm
---- http_config eval: $::HttpConfig
---- config
-    location = /t {
-        content_by_lua_block {
-            local we = require "resty.worker.events"
-            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local we = require "resty.events.compat"
+            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
             local healthcheck = require("resty.healthcheck")
             local ok, err = pcall(healthcheck.new, {
                 name = "testing",
                 shm_name = "invalid_shm",
+                events_module = "resty.events",
             })
             ngx.log(ngx.ERR, err)
         }
@@ -98,17 +92,18 @@ GET /t
 --- error_log
 no shm found by name
 
-=== TEST 5: new() initializes with default config
+=== TEST 4: new() initializes with default config
 --- http_config eval: $::HttpConfig
 --- config
     location = /t {
         content_by_lua_block {
-            local we = require "resty.worker.events"
-            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local we = require "resty.events.compat"
+            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
             local healthcheck = require("resty.healthcheck")
             local ok, err = pcall(healthcheck.new, {
                 name = "testing",
                 shm_name = "test_shm",
+                events_module = "resty.events",
             })
         }
     }
@@ -119,29 +114,32 @@ GET /t
 --- error_log
 Healthchecker started!
 
-=== TEST 6: new() only accepts http or tcp types
+=== TEST 5: new() only accepts http or tcp types
 --- http_config eval: $::HttpConfig
 --- config
     location = /t {
         content_by_lua_block {
-            local we = require "resty.worker.events"
-            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local we = require "resty.events.compat"
+            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
             local healthcheck = require("resty.healthcheck")
             local ok, err = pcall(healthcheck.new, {
                 name = "testing",
                 shm_name = "test_shm",
+                events_module = "resty.events",
                 type = "http",
             })
             ngx.say(ok)
             local ok, err = pcall(healthcheck.new, {
                 name = "testing",
                 shm_name = "test_shm",
+                events_module = "resty.events",
                 type = "tcp",
             })
             ngx.say(ok)
             local ok, err = pcall(healthcheck.new, {
                 name = "testing",
                 shm_name = "test_shm",
+                events_module = "resty.events",
                 type = "get lost",
             })
             ngx.say(ok)
@@ -154,13 +152,13 @@ true
 true
 false
 
-=== TEST 7: new() deals with bad inputs
+=== TEST 6: new() deals with bad inputs
 --- http_config eval: $::HttpConfig
 --- config
     location = /t {
         content_by_lua_block {
-            local we = require "resty.worker.events"
-            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local we = require "resty.events.compat"
+            assert(we.configure({ unique_timeout = 5, broker_id = 0, listening = "unix:" .. ngx.config.prefix() .. "worker_events.sock" }))
             local healthcheck = require("resty.healthcheck")
 
             -- tests for failure
@@ -194,6 +192,7 @@ false
                 local ok, err = pcall(healthcheck.new, {
                     name = "testing",
                     shm_name = "test_shm",
+                    events_module = "resty.events",
                     type = "http",
                     checks = test,
                 })

@@ -1,0 +1,27 @@
+#!/usr/bin/env lua
+
+if not arg[1] then
+   io.stderr:write("Usage: "..arg[0].." t/*.t\n")
+   os.exit(1)
+end
+
+for _, name in ipairs(arg) do
+   local i = 1
+   local fd = io.open(name, "r")
+   if fd then
+      local new = name.."~"
+      local out = io.open(new, "w")
+      for line in fd:lines() do
+         local test, n, desc = line:match("^(===%s*TEST%s*)(%d+)(.*)$")
+         if test then
+            out:write(test .. tostring(i) .. desc .. "\n")
+            i = i + 1
+         else
+            out:write(line .. "\n")
+         end
+      end
+      out:close()
+      fd:close()
+      os.execute("mv " .. new .. " " .. name)
+   end
+end

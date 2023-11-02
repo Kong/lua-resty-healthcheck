@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * (blocks() * 4) + 2;
+plan tests => repeat_each() * (blocks() * 4);
 
 my $pwd = cwd();
 
@@ -77,9 +77,6 @@ GET /t
 true
 false
 true
---- error_log
-checking healthy targets: nothing to do
-checking unhealthy targets: nothing to do
 --- no_error_log
 checking healthy targets: #1
 checking unhealthy targets: #1

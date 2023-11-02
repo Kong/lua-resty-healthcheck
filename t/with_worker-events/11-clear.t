@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * 23;
+plan tests => repeat_each() * 27;
 
 my $pwd = cwd();
 
@@ -100,7 +100,7 @@ initial target list (11 targets)
                 checker1:add_target("127.0.0.1", 20000 + i, nil, false)
             end
             checker2:clear()
-            ngx.sleep(0.2) -- wait twice the interval
+            ngx.sleep(1)
             ngx.say(true)
         }
     }
@@ -151,7 +151,7 @@ qq{
             }
             local checker1 = healthcheck.new(config)
             checker1:add_target("127.0.0.1", 21120, nil, true)
-            ngx.sleep(0.3) -- wait 1.5x the interval
+            ngx.sleep(0.5) -- wait 2.5x the interval
             checker1:clear()
             checker1:add_target("127.0.0.1", 21120, nil, true)
             ngx.sleep(0.3) -- wait 1.5x the interval
@@ -164,7 +164,119 @@ GET /t
 true
 
 --- error_log
-unhealthy HTTP increment (1/3) for '(127.0.0.1:21120)'
-unhealthy HTTP increment (2/3) for '(127.0.0.1:21120)'
+unhealthy HTTP increment (1/3) for '127.0.0.1(127.0.0.1:21120)'
+unhealthy HTTP increment (2/3) for '127.0.0.1(127.0.0.1:21120)'
 --- no_error_log
 unhealthy HTTP increment (3/3) for '(127.0.0.1:21120)'
+
+
+=== TEST 4: delayed_clear() clears the list, after interval new checkers don't see it
+--- http_config eval: $::HttpConfig
+--- config
+    location = /t {
+        content_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+            local config = {
+                name = "testing",
+                shm_name = "test_shm",
+                checks = {
+                    active = {
+                        healthy  = {
+                            interval = 0.1
+                        },
+                        unhealthy  = {
+                            interval = 0.1
+                        }
+                    }
+                }
+            }
+            local checker1 = healthcheck.new(config)
+            for i = 1, 10 do
+                checker1:add_target("127.0.0.1", 10000 + i, nil, false)
+            end
+            ngx.sleep(0.2) -- wait twice the interval
+            ngx.say(checker1:get_target_status("127.0.0.1", 10001))
+            checker1:delayed_clear(0.2)
+
+            local checker2 = healthcheck.new(config)
+            ngx.say(checker2:get_target_status("127.0.0.1", 10001))
+            ngx.sleep(2.6) -- wait while the targets are cleared
+            local status, err = checker2:get_target_status("127.0.0.1", 10001)
+            if status ~= nil then
+                ngx.say(status)
+            else
+                ngx.say(err)
+            end
+        }
+    }
+--- request
+GET /t
+--- response_body
+false
+false
+target not found
+
+=== TEST 5: delayed_clear() would clear tgt list, but adding again keeps the previous status
+--- http_config eval: $::HttpConfig
+--- config
+    location = /t {
+        content_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+            local config = {
+                name = "testing",
+                shm_name = "test_shm",
+                checks = {
+                    active = {
+                        healthy  = {
+                            interval = 0.1
+                        },
+                        unhealthy  = {
+                            interval = 0.1
+                        }
+                    }
+                }
+            }
+            local checker1 = healthcheck.new(config)
+            checker1:add_target("127.0.0.1", 10001, nil, false)
+            checker1:add_target("127.0.0.1", 10002, nil, false)
+            checker1:add_target("127.0.0.1", 10003, nil, false)
+            ngx.sleep(0.2) -- wait twice the interval
+            ngx.say(checker1:get_target_status("127.0.0.1", 10002))
+            checker1:delayed_clear(0.2)
+
+            local checker2 = healthcheck.new(config)
+            checker2:add_target("127.0.0.1", 10002, nil, true)
+            ngx.say(checker2:get_target_status("127.0.0.1", 10002))
+            ngx.sleep(2.6) -- wait while the targets would be cleared
+            local status, err = checker2:get_target_status("127.0.0.1", 10001)
+            if status ~= nil then
+                ngx.say(status)
+            else
+                ngx.say(err)
+            end
+            status, err = checker2:get_target_status("127.0.0.1", 10002)
+            if status ~= nil then
+                ngx.say(status)
+            else
+                ngx.say(err)
+            end
+            status, err = checker2:get_target_status("127.0.0.1", 10003)
+            if status ~= nil then
+                ngx.say(status)
+            else
+                ngx.say(err)
+            end
+        }
+    }
+--- request
+GET /t
+--- response_body
+false
+false
+target not found
+false
+target not found

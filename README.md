@@ -1,6 +1,9 @@
 # lua-resty-healthcheck
 
-[![Build Status][badge-travis-image]][badge-travis-url]
+![legacy version](https://img.shields.io/luarocks/v/kong/lua-resty-healthcheck/1.6.1-1?style=flat-square)
+![Release 1.6.x](https://github.com/Kong/lua-resty-healthcheck/actions/workflows/build_and_test_with_resty_events.yml/badge.svg?branch=release/1.6.x)
+![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square)
+![Twitter Follow](https://img.shields.io/twitter/follow/thekonginc?style=social)
 
 A health check library for OpenResty.
 
@@ -87,6 +90,116 @@ for the complete API.
 ## History
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
+
+### Releasing new versions:
+
+* update changelog below (PR's should be merged including a changelog entry)
+* based on changelog determine new SemVer version
+* create a new rockspec
+* render the docs using `ldoc` (don't do this within PR's)
+* commit as "release x.x.x" (do not include rockspec revision)
+* tag the commit with "x.x.x" (do not include rockspec revision)
+* push commit and tag
+* upload rock to luarocks: `luarocks upload rockspecs/[name] --api-key=abc`
+
+### 3.0.0 (12-Oct-2023)
+
+* Perf: optimize by localizing some functions [#92](https://github.com/Kong/lua-resty-healthcheck/pull/92) (backport)
+* Fix: Generate fresh default http_statuses within new() [#83](https://github.com/Kong/lua-resty-healthcheck/pull/83) (backport)
+
+### 2.0.0
+--- Version discarded from current & future development
+
+### 1.6.3 (06-Sep-2023)
+
+* Feature: Added support for https_sni [#49](https://github.com/Kong/lua-resty-healthcheck/pull/49) (backport)
+* Fix: Use OpenResty API for mTLS [#99](https://github.com/Kong/lua-resty-healthcheck/pull/99) (backport)
+
+### 1.6.2 (17-Nov-2022)
+
+* Fix: avoid raising worker events for new targets that were marked for delayed
+  removal, i.e. targets that already exist in memory only need the removal flag
+  cleared when added back. [#122](https://github.com/Kong/lua-resty-healthcheck/pull/122)
+
+### 1.6.1 (25-Jul-2022)
+
+* Fix: improvements to ensure the proper securing of shared resources to avoid
+  race conditions and clearly report failure states.
+  [#112](https://github.com/Kong/lua-resty-healthcheck/pull/112),
+  [#113](https://github.com/Kong/lua-resty-healthcheck/pull/113),
+  [#114](https://github.com/Kong/lua-resty-healthcheck/pull/114).
+* Fix: reduce the frequency of checking for unused targets, reducing the number
+  of locks created. [#116](https://github.com/Kong/lua-resty-healthcheck/pull/116)
+* Fix accept any [lua-resty-events](https://github.com/Kong/lua-resty-events)
+  `0.1.x` release. [#118](https://github.com/Kong/lua-resty-healthcheck/pull/118)
+
+### 1.6.0 (27-Jun-2022)
+
+* Feature: introduce support to [lua-resty-events](https://github.com/Kong/lua-resty-events)
+  module in addition to [lua-resty-worker-events](https://github.com/Kong/lua-resty-worker-events)
+  support. With this addition, the lua-resty-healthcheck luarocks package does
+  not require a specific event-sharing module anymore, but you are still
+  required to provide either lua-resty-worker-events or lua-resty-events.
+  [#105](https://github.com/Kong/lua-resty-healthcheck/pull/105)
+* Change: if available, lua-resty-healthcheck now uses `string.buffer`, the new LuaJIT's
+  serialization API. If it is unavailable, lua-resty-healthcheck fallbacks to
+  cjson.  [#109](https://github.com/Kong/lua-resty-healthcheck/pull/109)
+
+### 1.5.3 (14-Nov-2022)
+
+* Fix: avoid raising worker events for new targets that were marked for delayed
+  removal, i.e. targets that already exist in memory only need the removal flag
+  cleared when added back. [#121](https://github.com/Kong/lua-resty-healthcheck/pull/121)
+
+### 1.5.2 (07-Jul-2022)
+
+* Better handling of `resty.lock` failure modes, adding more checks to ensure the
+  lock is held before running critical code, and improving the decision whether a
+  function should be retried after a timeout trying to acquire a lock.
+  [#113](https://github.com/Kong/lua-resty-healthcheck/pull/113)
+* Increased logging for locked function failures.
+  [#114](https://github.com/Kong/lua-resty-healthcheck/pull/114)
+* The cleanup frequency of deleted targets was lowered, cutting the number of
+  created locks in a short period.
+  [#116](https://github.com/Kong/lua-resty-healthcheck/pull/116)
+
+### 1.5.1 (23-Mar-2022)
+
+* Fix: avoid breaking active health checks when adding or removing targets.
+  [#93](https://github.com/Kong/lua-resty-healthcheck/pull/93)
+
+### 1.5.0 (09-Feb-2022)
+
+* New option `checks.active.headers` supports one or more lists of values indexed by
+  header name. [#87](https://github.com/Kong/lua-resty-healthcheck/pull/87)
+* Introduce dealyed_clear() function, used to remove addresses after a time interval.
+  This function may be used when an address is being removed but may be added again
+  before the interval expires, keeping its health status.
+  [#88](https://github.com/Kong/lua-resty-healthcheck/pull/88)
+
+### 1.4.3 (31-Mar-2022)
+
+* Fix: avoid breaking active health checks when adding or removing targets.
+  [#100](https://github.com/Kong/lua-resty-healthcheck/pull/100)
+
+### 1.4.2 (29-Jun-2021)
+
+* Fix: prevent new active checks being scheduled while a health check is running.
+  [#72](https://github.com/Kong/lua-resty-healthcheck/pull/72)
+* Fix: remove event watcher when stopping an active health check.
+  [#74](https://github.com/Kong/lua-resty-healthcheck/pull/74); fixes Kong issue
+  [#7406](https://github.com/Kong/kong/issues/7406)
+
+### 1.4.1 (17-Feb-2021)
+
+* Fix: make sure that a single worker will actively check hosts' statuses.
+  [#67](https://github.com/Kong/lua-resty-healthcheck/pull/67)
+
+### 1.4.0 (07-Jan-2021)
+
+* Use a single timer to actively health check targets. This reduces the number
+  of timers used by health checkers, as they used to use two timers by each
+  target. [#62](https://github.com/Kong/lua-resty-healthcheck/pull/62)
 
 ### 1.3.0 (17-Jun-2020)
 
@@ -176,7 +289,7 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 ## Copyright and License
 
 ```
-Copyright 2017-2019 Kong Inc.
+Copyright 2017-2022 Kong Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
