@@ -1,7 +1,8 @@
 # lua-resty-healthcheck
 
-![legacy version](https://img.shields.io/luarocks/v/kong/lua-resty-healthcheck/1.6.1-1?style=flat-square)
-![Release 1.6.x](https://github.com/Kong/lua-resty-healthcheck/actions/workflows/build_and_test_with_resty_events.yml/badge.svg?branch=release/1.6.x)
+![latest version](https://img.shields.io/github/v/tag/Kong/lua-resty-healthcheck?sort=semver)
+![latest luarocks version](https://img.shields.io/luarocks/v/kong/lua-resty-healthcheck?style=flat-square)
+![master branch](https://github.com/Kong/lua-resty-healthcheck/actions/workflows/latest_os.yml/badge.svg)
 ![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square)
 ![Twitter Follow](https://img.shields.io/twitter/follow/thekonginc?style=social)
 
