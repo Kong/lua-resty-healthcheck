@@ -339,12 +339,14 @@ target not found
             checker1:add_target("127.0.0.1", 10001, nil, true)
             checker1:add_target("127.0.0.1", 10002, nil, true)
             checker1:add_target("127.0.0.1", 10003, nil, true)
+            ngx.sleep(0.2)
             ngx.say(checker1:get_target_status("127.0.0.1", 10002))
             checker1:delayed_clear(0.2)
 
             local checker2 = healthcheck.new(config2)
             checker2:add_target("127.0.0.1", 10001, nil, true)
             checker2:add_target("127.0.0.1", 10002, nil, true)
+            ngx.sleep(0.2)
             ngx.say(checker2:get_target_status("127.0.0.1", 10002))
             checker2:delayed_clear(0.2)
 
