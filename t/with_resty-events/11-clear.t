@@ -302,8 +302,6 @@ target not found
 --- config
     location = /t {
         content_by_lua_block {
-            local we = require "resty.worker.events"
-            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
             local healthcheck = require("resty.healthcheck")
             local config1 = {
                 name = "testing",
