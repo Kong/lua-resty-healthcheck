@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * 27;
+plan tests => repeat_each() * 27 + 2;
 
 my $pwd = cwd();
 $ENV{TEST_NGINX_SERVROOT} = server_root();
@@ -295,4 +295,86 @@ false
 false
 target not found
 false
+target not found
+
+=== TEST 6: delayed_clear() would clear tgt list when we add two checkers
+--- http_config eval: $::HttpConfig
+--- config
+    location = /t {
+        content_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+            local config1 = {
+                name = "testing",
+                shm_name = "test_shm",
+                checks = {
+                    active = {
+                        healthy  = {
+                            interval = 0.1
+                        },
+                        unhealthy  = {
+                            interval = 0.1
+                        }
+                    }
+                }
+            }
+
+            local config2 = {
+                name = "testing2",
+                shm_name = "test_shm",
+                checks = {
+                    active = {
+                        healthy  = {
+                            interval = 0.1
+                        },
+                        unhealthy  = {
+                            interval = 0.1
+                        }
+                    }
+                }
+            }
+
+            local checker1 = healthcheck.new(config1)
+            checker1:add_target("127.0.0.1", 10001, nil, true)
+            checker1:add_target("127.0.0.1", 10002, nil, true)
+            checker1:add_target("127.0.0.1", 10003, nil, true)
+            ngx.say(checker1:get_target_status("127.0.0.1", 10002))
+            checker1:delayed_clear(0.2)
+
+            local checker2 = healthcheck.new(config2)
+            checker2:add_target("127.0.0.1", 10001, nil, true)
+            checker2:add_target("127.0.0.1", 10002, nil, true)
+            ngx.say(checker2:get_target_status("127.0.0.1", 10002))
+            checker2:delayed_clear(0.2)
+
+            ngx.sleep(3) -- wait twice the interval
+
+            local status, err = checker1:get_target_status("127.0.0.1", 10001)
+            if status ~= nil then
+                ngx.say(status)
+            else
+                ngx.say(err)
+            end
+            status, err = checker2:get_target_status("127.0.0.1", 10002)
+            if status ~= nil then
+                ngx.say(status)
+            else
+                ngx.say(err)
+            end
+            status, err = checker2:get_target_status("127.0.0.1", 10003)
+            if status ~= nil then
+                ngx.say(status)
+            else
+                ngx.say(err)
+            end
+        }
+    }
+--- request
+GET /t
+--- response_body
+true
+true
+target not found
+target not found
 target not found
