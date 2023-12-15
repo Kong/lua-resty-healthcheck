@@ -308,6 +308,7 @@ target not found
             local config1 = {
                 name = "testing",
                 shm_name = "test_shm",
+                events_module = "resty.events",
                 checks = {
                     active = {
                         healthy  = {
@@ -323,6 +324,7 @@ target not found
             local config2 = {
                 name = "testing2",
                 shm_name = "test_shm",
+                events_module = "resty.events",
                 checks = {
                     active = {
                         healthy  = {
