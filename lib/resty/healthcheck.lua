@@ -1694,9 +1694,9 @@ function _M.new(opts)
         for _, checker_obj in pairs(hcs) do
 
           if (last_cleanup_check + CLEANUP_INTERVAL) < cur_time then
-            is_checked = true
             -- clear targets marked for delayed removal
             locking_target_list(checker_obj, function(target_list)
+              is_checked = true
               local removed_targets = {}
               local index = 1
               while index <= #target_list do
