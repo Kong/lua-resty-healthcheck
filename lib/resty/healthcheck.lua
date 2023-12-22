@@ -1652,11 +1652,13 @@ function _M.new(opts)
         end
 
         local cur_time = ngx_now()
+        local is_checked = false
         for _, checker_obj in pairs(hcs) do
 
           if (last_cleanup_check + CLEANUP_INTERVAL) < cur_time then
             -- clear targets marked for delayed removal
             locking_target_list(checker_obj, function(target_list)
+              is_checked = true
               local removed_targets = {}
               local index = 1
               while index <= #target_list do
@@ -1683,8 +1685,6 @@ function _M.new(opts)
                 end
               end
             end)
-
-            last_cleanup_check = cur_time
           end
 
           if checker_obj.checks.active.healthy.active and
@@ -1702,6 +1702,9 @@ function _M.new(opts)
             checker_obj.checks.active.unhealthy.last_run = cur_time
             checker_callback(checker_obj, "unhealthy")
           end
+        end
+        if is_checked then
+          last_cleanup_check = cur_time
         end
       end,
     })
