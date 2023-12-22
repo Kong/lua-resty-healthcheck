@@ -103,6 +103,10 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 * push commit and tag
 * upload rock to luarocks: `luarocks upload rockspecs/[name] --api-key=abc`
 
+### 3.0.1 (22-Dec-2023)
+
+* Fix: fix delay clean logic when multiple healthchecker was started [#146](https://github.com/Kong/lua-resty-healthcheck/pull/146)
+
 ### 3.0.0 (12-Oct-2023)
 
 * Perf: optimize by localizing some functions [#92](https://github.com/Kong/lua-resty-healthcheck/pull/92) (backport)
