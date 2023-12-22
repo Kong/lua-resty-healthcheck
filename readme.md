@@ -91,6 +91,11 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.5.4 (22-Dec-2023)
+
+* Fix: fix delay clean logic when multiple healthchecker was
+  started [#146](https://github.com/Kong/lua-resty-healthcheck/pull/146)
+
 ### 1.5.3 (14-Nov-2022)
 
 * Fix: avoid raising worker events for new targets that were marked for delayed
