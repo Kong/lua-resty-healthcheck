@@ -91,6 +91,10 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.6.4 (22-Dec-2023)
+
+* Fix: fix delay clean logic when multiple healthchecker was started [#146](https://github.com/Kong/lua-resty-healthcheck/pull/146)
+
 ### 1.6.3 (06-Sep-2023)
 
 * Feature: Added support for https_sni [#49](https://github.com/Kong/lua-resty-healthcheck/pull/49) (backport)
