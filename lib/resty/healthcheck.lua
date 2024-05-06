@@ -1236,19 +1236,16 @@ local function checker_callback(self, health_mode)
   if not list_to_check[1] then
     self:log(DEBUG, "checking ", health_mode, " targets: nothing to do")
   else
-    local timer = resty_timer({
-      interval = 0,
-      recurring = false,
-      immediate = false,
-      detached = true,
-      expire = function()
-        self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
-        self:active_check_targets(list_to_check)
-      end,
-    })
-    if timer == nil then
-      self:log(ERR, "failed to create timer to check ", health_mode)
+    local thread = ngx.thread.spawn(function(mode, list)
+      self:log(DEBUG, "checking ", mode, " targets: #", #list)
+      self:active_check_targets(list)
+    end, health_mode, list_to_check)
+
+    if thread == nil then
+      self:log(ERR, "failed to create thread to check ", health_mode)
+      return
     end
+    ngx.thread.wait(thread)
   end
 end
 
