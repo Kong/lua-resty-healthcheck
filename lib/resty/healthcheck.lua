@@ -1241,11 +1241,6 @@ local function checker_callback(self, health_mode)
       self:active_check_targets(list)
     end, health_mode, list_to_check)
 
-    if thread == nil then
-      self:log(ERR, "failed to create thread to check ", health_mode)
-      return
-    end
-
     local ok, err = ngx.thread.wait(thread)
     if not ok then
       self:log(ERR, "failed to wait for thread to check ", health_mode, ": ", err)
