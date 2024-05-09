@@ -33,6 +33,7 @@ local ipairs = ipairs
 local table_insert = table.insert
 local table_remove = table.remove
 local string_format = string.format
+local math_max = math.max
 local ssl = require("ngx.ssl")
 local resty_timer = require "resty.timer"
 local bit = require("bit")
@@ -1165,13 +1166,13 @@ end
 
 -- @return `true` on success, or false if the lock was not acquired, or `nil + error`
 -- in case of errors
-local function get_periodic_lock(shm, key)
+local function get_periodic_lock(shm, key, ttl)
   local my_pid = ngx_worker_pid()
   local checker_pid = shm:get(key)
 
   if checker_pid == nil then
     -- no worker is checking, try to acquire the lock
-    local ok, err = shm:add(key, my_pid, LOCK_PERIOD)
+    local ok, err = shm:add(key, my_pid, ttl or LOCK_PERIOD)
     if not ok then
       if err == "exists" then
         -- another worker got the lock before
@@ -1200,12 +1201,35 @@ local function renew_periodic_lock(shm, key)
 end
 
 
+local function remove_periodic_lock(shm, key)
+  return shm:delete(key)
+end
+
+
 --- Active health check callback function.
 -- @param self the checker object this timer runs on
 -- @param health_mode either "healthy" or "unhealthy" to indicate what check
 local function checker_callback(self, health_mode)
   if self.checker_callback_count then
     self.checker_callback_count = self.checker_callback_count + 1
+  end
+
+  -- Set a callback pending lock will exist for 2x the time of the active check.
+  -- An active check should be finished within this time and next timer will be
+  -- executed to exit a pending status.
+  -- Note that this does not influence the actual check interval, but only
+  -- limiting the number of scheduling another same check when the previous one
+  -- is still pending.
+  local callback_pending_ttl = (math_max(self.checks.active.healthy.active and
+                                         self.checks.active.healthy.interval or 0,
+                                         self.checks.active.unhealthy.active and
+                                         self.checks.active.unhealthy.interval or 0)
+                                         + self.checks.active.timeout) * 2
+
+  -- a pending timer already exists, so skip this time
+  local ok, _ = get_periodic_lock(self.shm, self.CALLBACK_LOCK, callback_pending_ttl)
+  if not ok then
+    return
   end
 
   local list_to_check = {}
@@ -1242,6 +1266,7 @@ local function checker_callback(self, health_mode)
       immediate = false,
       detached = true,
       expire = function()
+        remove_periodic_lock(self.shm, self.CALLBACK_LOCK)
         self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
         self:active_check_targets(list_to_check)
       end,
@@ -1614,6 +1639,7 @@ function _M.new(opts)
   self.TARGET_LIST_LOCK = SHM_PREFIX .. self.name .. ":target_list_lock"
   self.TARGET_LOCK      = SHM_PREFIX .. self.name .. ":target_lock"
   self.PERIODIC_LOCK    = SHM_PREFIX .. ":period_lock:"
+  self.CALLBACK_LOCK    = SHM_PREFIX .. self.name .. ":callback_lock"
   -- prepare constants
   self.EVENT_SOURCE     = EVENT_SOURCE_PREFIX .. " [" .. self.name .. "]"
   self.LOG_PREFIX       = LOG_PREFIX .. "(" .. self.name .. ") "
