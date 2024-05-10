@@ -1201,7 +1201,28 @@ local function renew_periodic_lock(shm, key)
 end
 
 
-local function remove_periodic_lock(shm, key)
+local function get_callback_lock(shm, key, ttl)
+  local value = shm:get(key)
+  if value == nil then
+    -- no worker is checking, try to acquire the lock
+    local ok, err = shm:add(key, true, ttl or LOCK_PERIOD)
+    if not ok then
+      if err == "exists" then
+        -- another worker got the lock before
+        return false
+      end
+
+      return nil, err
+    end
+
+    return true
+  end
+
+  return false
+end
+
+
+local function remove_callback_lock(shm, key)
   return shm:delete(key)
 end
 
@@ -1217,9 +1238,6 @@ local function checker_callback(self, health_mode)
   -- Set a callback pending lock will exist for 2x the time of the active check.
   -- An active check should be finished within this time and next timer will be
   -- executed to exit a pending status.
-  -- Note that this does not influence the actual check interval, but only
-  -- limiting the number of scheduling another same check when the previous one
-  -- is still pending.
   local callback_pending_ttl = (math_max(self.checks.active.healthy.active and
                                          self.checks.active.healthy.interval or 0,
                                          self.checks.active.unhealthy.active and
@@ -1227,7 +1245,7 @@ local function checker_callback(self, health_mode)
                                          + self.checks.active.timeout) * 2
 
   -- a pending timer already exists, so skip this time
-  local ok, _ = get_periodic_lock(self.shm, self.CALLBACK_LOCK, callback_pending_ttl)
+  local ok, _ = get_callback_lock(self.shm, self.CALLBACK_LOCK, callback_pending_ttl)
   if not ok then
     return
   end
@@ -1266,9 +1284,9 @@ local function checker_callback(self, health_mode)
       immediate = false,
       detached = true,
       expire = function()
-        remove_periodic_lock(self.shm, self.CALLBACK_LOCK)
         self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
         self:active_check_targets(list_to_check)
+        remove_callback_lock(self.shm, self.CALLBACK_LOCK)
       end,
     })
     if timer == nil then
