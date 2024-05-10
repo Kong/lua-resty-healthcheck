@@ -1255,6 +1255,7 @@ local function checker_callback(self, health_mode)
   local targets, err = fetch_target_list(self)
   if not targets then
     self:log(ERR, "checker_callback: ", err)
+    remove_callback_lock(self.shm, callback_lock)
     return
   end
 
@@ -1278,6 +1279,7 @@ local function checker_callback(self, health_mode)
 
   if not list_to_check[1] then
     self:log(DEBUG, "checking ", health_mode, " targets: nothing to do")
+    remove_callback_lock(self.shm, callback_lock)
   else
     local timer = resty_timer({
       interval = 0,
@@ -1292,6 +1294,7 @@ local function checker_callback(self, health_mode)
     })
     if timer == nil then
       self:log(ERR, "failed to create timer to check ", health_mode)
+      remove_callback_lock(self.shm, callback_lock)
     end
   end
 end
