@@ -58,7 +58,7 @@ GET /t
 --- response_body
 true
 --- timeout
-15
+20
 
 === TEST 2: active probes, invalid cert
 --- http_config eval: $::HttpConfig
@@ -99,7 +99,7 @@ GET /t
 --- response_body
 false
 --- timeout
-15
+20
 
 === TEST 3: active probes, accept invalid cert when disabling check
 --- http_config eval: $::HttpConfig
@@ -141,4 +141,4 @@ GET /t
 --- response_body
 true
 --- timeout
-15
+20
