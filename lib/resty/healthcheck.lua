@@ -1166,13 +1166,13 @@ end
 
 -- @return `true` on success, or false if the lock was not acquired, or `nil + error`
 -- in case of errors
-local function get_periodic_lock(shm, key, ttl)
+local function get_periodic_lock(shm, key)
   local my_pid = ngx_worker_pid()
   local checker_pid = shm:get(key)
 
   if checker_pid == nil then
     -- no worker is checking, try to acquire the lock
-    local ok, err = shm:add(key, my_pid, ttl or LOCK_PERIOD)
+    local ok, err = shm:add(key, my_pid, LOCK_PERIOD)
     if not ok then
       if err == "exists" then
         -- another worker got the lock before
