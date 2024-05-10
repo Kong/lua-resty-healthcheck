@@ -60,7 +60,7 @@ qq{
                 }
             })
             local ok, err = checker:add_target("127.0.0.1", 2130, nil, true)
-            ngx.sleep(4) -- wait for some time to let the checks run
+            ngx.sleep(3) -- wait for some time to let the checks run
             -- There should be no more than 3 timers running atm, but
             -- add a few spaces for worker events
             ngx.say(tonumber(ngx.timer.running_count()) <= 5)
