@@ -1244,8 +1244,9 @@ local function checker_callback(self, health_mode)
                                          self.checks.active.unhealthy.interval or 0)
                                          + self.checks.active.timeout) * 2
 
+  local callback_lock = self.CALLBACK_LOCK .. health_mode
   -- a pending timer already exists, so skip this time
-  local ok, _ = get_callback_lock(self.shm, self.CALLBACK_LOCK, callback_pending_ttl)
+  local ok, _ = get_callback_lock(self.shm, callback_lock, callback_pending_ttl)
   if not ok then
     return
   end
@@ -1286,7 +1287,7 @@ local function checker_callback(self, health_mode)
       expire = function()
         self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
         self:active_check_targets(list_to_check)
-        remove_callback_lock(self.shm, self.CALLBACK_LOCK)
+        remove_callback_lock(self.shm, callback_lock)
       end,
     })
     if timer == nil then
@@ -1657,7 +1658,7 @@ function _M.new(opts)
   self.TARGET_LIST_LOCK = SHM_PREFIX .. self.name .. ":target_list_lock"
   self.TARGET_LOCK      = SHM_PREFIX .. self.name .. ":target_lock"
   self.PERIODIC_LOCK    = SHM_PREFIX .. ":period_lock:"
-  self.CALLBACK_LOCK    = SHM_PREFIX .. self.name .. ":callback_lock"
+  self.CALLBACK_LOCK    = SHM_PREFIX .. self.name .. ":callback_lock:"
   -- prepare constants
   self.EVENT_SOURCE     = EVENT_SOURCE_PREFIX .. " [" .. self.name .. "]"
   self.LOG_PREFIX       = LOG_PREFIX .. "(" .. self.name .. ") "
