@@ -34,6 +34,7 @@ __DATA__
                 shm_name = "test_shm",
                 checks = {
                     active = {
+                        timeout = 2,
                         type = "https",
                         http_path = "/",
                         healthy  = {
@@ -48,7 +49,7 @@ __DATA__
                 }
             })
             local ok, err = checker:add_target("104.154.89.105", 443, "badssl.com", false)
-            ngx.sleep(8) -- wait for 4x the check interval
+            ngx.sleep(16) -- wait for 4x the check interval
             ngx.say(checker:get_target_status("104.154.89.105", 443, "badssl.com"))  -- true
         }
     }
@@ -74,6 +75,7 @@ true
                 shm_name = "test_shm",
                 checks = {
                     active = {
+                        timeout = 2,
                         type = "https",
                         http_path = "/",
                         healthy  = {
@@ -88,7 +90,7 @@ true
                 }
             })
             local ok, err = checker:add_target("104.154.89.105", 443, "wrong.host.badssl.com", true)
-            ngx.sleep(8) -- wait for 4x the check interval
+            ngx.sleep(16) -- wait for 4x the check interval
             ngx.say(checker:get_target_status("104.154.89.105", 443, "wrong.host.badssl.com"))  -- false
         }
     }
@@ -114,6 +116,7 @@ false
                 shm_name = "test_shm",
                 checks = {
                     active = {
+                        timeout = 2,
                         type = "https",
                         https_verify_certificate = false,
                         http_path = "/",
@@ -129,7 +132,7 @@ false
                 }
             })
             local ok, err = checker:add_target("104.154.89.105", 443, "wrong.host.badssl.com", false)
-            ngx.sleep(8) -- wait for 4x the check interval
+            ngx.sleep(16) -- wait for 4x the check interval
             ngx.say(checker:get_target_status("104.154.89.105", 443, "wrong.host.badssl.com"))  -- true
         }
     }
