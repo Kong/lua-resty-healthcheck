@@ -91,6 +91,10 @@ for the complete API.
 
 Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 
+### 1.6.5 (15-May-2024)
+
+* Fix: avoid creating multiple timers to run the same active check [#156](https://github.com/Kong/lua-resty-healthcheck/pull/156)
+
 ### 1.6.4 (22-Dec-2023)
 
 * Fix: fix delay clean logic when multiple healthchecker was started [#146](https://github.com/Kong/lua-resty-healthcheck/pull/146)
