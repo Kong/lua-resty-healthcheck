@@ -34,6 +34,7 @@ local table_insert = table.insert
 local table_remove = table.remove
 local table_concat = table.concat
 local string_format = string.format
+local math_max = math.max
 local ssl = require("ngx.ssl")
 local resty_timer = require "resty.timer"
 local bit = require("bit")
@@ -1201,6 +1202,32 @@ local function renew_periodic_lock(shm, key)
 end
 
 
+local function get_callback_lock(shm, key, ttl)
+  local value = shm:get(key)
+  if value == nil then
+    -- no worker is checking, try to acquire the lock
+    local ok, err = shm:add(key, true, ttl or LOCK_PERIOD)
+    if not ok then
+      if err == "exists" then
+        -- another worker got the lock before
+        return false
+      end
+
+      return nil, err
+    end
+
+    return true
+  end
+
+  return false
+end
+
+
+local function remove_callback_lock(shm, key)
+  return shm:delete(key)
+end
+
+
 --- Active health check callback function.
 -- @param self the checker object this timer runs on
 -- @param health_mode either "healthy" or "unhealthy" to indicate what check
@@ -1209,10 +1236,27 @@ local function checker_callback(self, health_mode)
     self.checker_callback_count = self.checker_callback_count + 1
   end
 
+  -- Set a callback pending lock will exist for 2x the time of the active check.
+  -- An active check should be finished within this time and next timer will be
+  -- executed to exit a pending status.
+  local callback_pending_ttl = (math_max(self.checks.active.healthy.active and
+                                         self.checks.active.healthy.interval or 0,
+                                         self.checks.active.unhealthy.active and
+                                         self.checks.active.unhealthy.interval or 0)
+                                         + self.checks.active.timeout) * 2
+
+  local callback_lock = self.CALLBACK_LOCK .. health_mode
+  -- a pending timer already exists, so skip this time
+  local ok, _ = get_callback_lock(self.shm, callback_lock, callback_pending_ttl)
+  if not ok then
+    return
+  end
+
   local list_to_check = {}
   local targets, err = fetch_target_list(self)
   if not targets then
     self:log(ERR, "checker_callback: ", err)
+    remove_callback_lock(self.shm, callback_lock)
     return
   end
 
@@ -1236,6 +1280,7 @@ local function checker_callback(self, health_mode)
 
   if not list_to_check[1] then
     self:log(DEBUG, "checking ", health_mode, " targets: nothing to do")
+    remove_callback_lock(self.shm, callback_lock)
   else
     local timer = resty_timer({
       interval = 0,
@@ -1245,10 +1290,12 @@ local function checker_callback(self, health_mode)
       expire = function()
         self:log(DEBUG, "checking ", health_mode, " targets: #", #list_to_check)
         self:active_check_targets(list_to_check)
+        remove_callback_lock(self.shm, callback_lock)
       end,
     })
     if timer == nil then
       self:log(ERR, "failed to create timer to check ", health_mode)
+      remove_callback_lock(self.shm, callback_lock)
     end
   end
 end
@@ -1618,6 +1665,7 @@ function _M.new(opts)
   self.TARGET_LIST_LOCK = SHM_PREFIX .. self.name .. ":target_list_lock"
   self.TARGET_LOCK      = SHM_PREFIX .. self.name .. ":target_lock"
   self.PERIODIC_LOCK    = SHM_PREFIX .. ":period_lock:"
+  self.CALLBACK_LOCK    = SHM_PREFIX .. self.name .. ":callback_lock:"
   -- prepare constants
   self.EVENT_SOURCE     = EVENT_SOURCE_PREFIX .. " [" .. self.name .. "]"
   self.LOG_PREFIX       = LOG_PREFIX .. "(" .. self.name .. ") "
