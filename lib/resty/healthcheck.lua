@@ -48,7 +48,7 @@ local type = type
 local assert = assert
 
 
-local RESTY_EVENTS_VER = [[^0\.1\.\d+$]]
+local RESTY_EVENTS_VER = [[^0\.[12]\.\d+$]]
 local RESTY_WORKER_EVENTS_VER = "0.3.3"
 
 
