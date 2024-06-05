@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        openresty-version: [1.19.9.1, 1.21.4.1]
+        openresty-version: [1.19.9.1, 1.21.4.1, 1.21.4.3, 1.25.3.1]
 
     steps:
       - name: Update and install OS dependencies
@@ -33,7 +33,7 @@ jobs:
       - name: Set environment variables
         env:
           OPENRESTY_VER: ${{ matrix.openresty-version }}
-          RESTY_EVENTS_VER: 0.1.2
+          RESTY_EVENTS_VER: 0.2.1
           LUAROCKS_VER: 3.9.0
           OPENSSL_VER: 1.1.1q
           PCRE_VER: 8.45
@@ -78,7 +78,7 @@ jobs:
         if: steps.cache-deps.outputs.cache-hit != 'true'
         with:
           repository: Kong/lua-resty-events
-          ref: refs/tags/0.1.0
+          ref: refs/tags/0.2.1
           path: lua-resty-events
 
       - name: Build and install OpenResty
