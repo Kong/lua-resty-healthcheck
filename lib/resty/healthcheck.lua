@@ -48,7 +48,6 @@ local type = type
 local assert = assert
 
 
-local RESTY_EVENTS_VER = [[^0\.[12]\.\d+$]]
 local RESTY_WORKER_EVENTS_VER = "0.3.3"
 
 
@@ -113,8 +112,6 @@ local function load_events_module(self)
 
   elseif self.events_module == "resty.events" then
     worker_events = require("resty.events.compat")
-    local version_match = ngx.re.match(worker_events._VERSION, RESTY_EVENTS_VER, "o")
-    assert(version_match, "unsupported lua-resty-events version")
 
   else
     error("unknown events module")

@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        openresty-version: [1.19.9.1, 1.21.4.1, 1.21.4.3, 1.25.3.1]
+        openresty-version: [1.19.9.1, 1.21.4.3, 1.25.3.1]
 
     steps:
       - name: Update and install OS dependencies
@@ -33,7 +33,7 @@ jobs:
       - name: Set environment variables
         env:
           OPENRESTY_VER: ${{ matrix.openresty-version }}
-          RESTY_EVENTS_VER: 0.2.1
+          RESTY_EVENTS_VER: 0.3.0
           LUAROCKS_VER: 3.9.0
           OPENSSL_VER: 1.1.1q
           PCRE_VER: 8.45
@@ -60,11 +60,9 @@ jobs:
           key: ${{ runner.os }}-${{ hashFiles('**/.github/workflows/build_and_test_with_resty_events.yml') }}-${{ matrix.openresty-version }}
 
       - name: Add to Path
-        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: echo "$INSTALL_ROOT/bin:$INSTALL_ROOT/nginx/sbin:$INSTALL_ROOT/luajit/bin:/usr/bin" >> $GITHUB_PATH
 
       - name: Build and install OpenSSL
-        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: |
           curl -sSLO https://www.openssl.org/source/openssl-$OPENSSL.tar.gz
           tar -xzf openssl-$OPENSSL.tar.gz
@@ -75,14 +73,12 @@ jobs:
 
       - name: Checkout lua-resty-events
         uses: actions/checkout@v3
-        if: steps.cache-deps.outputs.cache-hit != 'true'
         with:
           repository: Kong/lua-resty-events
-          ref: refs/tags/0.2.1
+          ref: refs/tags/0.3.0
           path: lua-resty-events
 
       - name: Build and install OpenResty
-        if: steps.cache-deps.outputs.cache-hit != true
         run: |
           curl -sSLO https://openresty.org/download/openresty-$OPENRESTY.tar.gz
           tar -xzf openresty-$OPENRESTY.tar.gz
@@ -106,7 +102,6 @@ jobs:
           make install LUA_LIBDIR=$INSTALL_ROOT/lualib
 
       - name: Install LuaRocks
-        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: |
           curl -sSLO https://luarocks.org/releases/luarocks-$LUAROCKS.tar.gz
           tar -xzf luarocks-$LUAROCKS.tar.gz
@@ -120,19 +115,16 @@ jobs:
           make install
 
       - name: Install manual dependencies
-        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: |
           luarocks install luacheck
 
       - name: Install Test::NGINX
-        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: |
           sudo apt-get install cpanminus
           cpanm --notest --local-lib=$HOME/perl5 local::lib && eval $(perl -I $HOME/perl5/lib/perl5/ -Mlocal::lib)
           cpanm --notest Test::Nginx
 
       - name: Install lua-resty-events
-        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: |
           cd lua-resty-events
           OPENRESTY_PREFIX=$INSTALL_ROOT PREFIX=$INSTALL_ROOT LUA_LIB_DIR=$INSTALL_ROOT/lualib make install
