@@ -103,6 +103,10 @@ Versioning is strictly based on [Semantic Versioning](https://semver.org/)
 * push commit and tag
 * upload rock to luarocks: `luarocks upload rockspecs/[name] --api-key=abc`
 
+### 3.1.0 (19-Jun-2024)
+
+* Feat: remove version check of resty.events [#162](https://github.com/Kong/lua-resty-healthcheck/pull/162)
+
 ### 3.0.2 (16-May-2024)
 
 * Fix: avoid creating multiple timers to run the same active check [#157](https://github.com/Kong/lua-resty-healthcheck/pull/157)
