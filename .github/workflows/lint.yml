@@ -35,7 +35,7 @@ jobs:
     # Optional step to run on only changed files
     - name: Get changed files
       id: changed-files
-      uses: kong/changed-files@54849deb963ca9f24185fb5de2965e002d066e6b # v37
+      uses: kong/changed-files@4edd678ac3f81e2dc578756871e4d00c19191daf
       with:
         files: |
           **.lua
