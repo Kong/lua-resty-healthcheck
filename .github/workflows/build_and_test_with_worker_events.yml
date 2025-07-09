@@ -16,10 +16,10 @@ on:
 jobs:
   build:
     name: CI using lua-resty-worker-events
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
-        openresty-version: [1.21.4.3]
+        openresty-version: [1.27.1.2]
 
     steps:
       - name: Update and install OS dependencies
@@ -36,17 +36,17 @@ jobs:
           echo "/usr/local/openresty/nginx/sbin" >> $GITHUB_PATH
 
       - name: Checkout lua-resty-healthcheck
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install OpenResty ${{ matrix.openresty-version }}
         env:
           OPENRESTY_VER: ${{ matrix.openresty-version }}
         run: |
           sudo apt-get -y install --no-install-recommends wget gnupg ca-certificates
-          wget -O - https://openresty.org/package/pubkey.gpg | sudo apt-key add -
-          echo "deb http://openresty.org/package/ubuntu $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/openresty.list
+          wget -O - https://openresty.org/package/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/openresty.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/openresty.gpg] http://openresty.org/package/ubuntu $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/openresty.list > /dev/null
           sudo apt-get update
-          sudo apt-get -y install openresty=$OPENRESTY_VER-1~focal1
+          sudo apt-get -y install openresty=$OPENRESTY_VER-1~jammy1
 
       - name: Install LuaRocks
         run: sudo apt-get install -y luarocks
@@ -63,7 +63,7 @@ jobs:
           cpanm --notest Test::Nginx
 
       - name: Checkout lua-resty-healthcheck
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install lua-resty-healthcheck
         run: sudo luarocks make

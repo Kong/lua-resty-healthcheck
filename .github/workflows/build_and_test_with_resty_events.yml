@@ -17,7 +17,7 @@ on:
 jobs:
   build:
     name: CI using lua-resty-events
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         openresty-version: [1.19.9.1, 1.21.4.3, 1.25.3.1]
@@ -34,9 +34,9 @@ jobs:
         env:
           OPENRESTY_VER: ${{ matrix.openresty-version }}
           RESTY_EVENTS_VER: 0.3.0
-          LUAROCKS_VER: 3.9.0
-          OPENSSL_VER: 1.1.1q
-          PCRE_VER: 8.45
+          LUAROCKS_VER: 3.12.0
+          OPENSSL_VER: 3.4.1
+          PCRE_VER: 10.45
         run: |
           echo "INSTALL_ROOT=/home/runner/work/cache/install-root" >> $GITHUB_ENV
           echo "DOWNLOAD_ROOT=/home/runner/work/cache/download-root" >> $GITHUB_ENV
@@ -48,10 +48,10 @@ jobs:
           echo "LD_LIBRARY_PATH=$HOME/install-root/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
       - name: Checkout lua-resty-healthcheck
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Lookup build cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-deps
         with:
           path: |
@@ -72,7 +72,7 @@ jobs:
           make install_sw
 
       - name: Checkout lua-resty-events
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: Kong/lua-resty-events
           ref: refs/tags/0.3.0
