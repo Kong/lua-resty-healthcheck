@@ -13,10 +13,6 @@ on:
       - main
       - master
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   lua-check:
     name: Lua Check
