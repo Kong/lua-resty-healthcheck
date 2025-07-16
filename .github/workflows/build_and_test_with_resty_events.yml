@@ -16,6 +16,7 @@ on:
 
 jobs:
   build:
+    timeout-minutes: ${{ fromJSON(vars.GHA_DEFAULT_TIMEOUT) }}
     name: CI using lua-resty-events
     runs-on: ubuntu-22.04
     strategy:
