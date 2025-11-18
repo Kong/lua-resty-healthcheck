@@ -1037,6 +1037,8 @@ function checker:run_single_check(ip, port, hostname, hostheader)
   local headers
   if self.checks.active._headers_str then
     headers = self.checks.active._headers_str
+  elseif req_headers == nil then
+      headers = "\r\n"
   else
     local headers_length = nkeys(req_headers)
     if headers_length > 0 then
