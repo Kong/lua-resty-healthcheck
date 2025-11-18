@@ -1484,7 +1484,7 @@ local function get_defaults()
         http_path = "/",
         https_sni = NO_DEFAULT,
         https_verify_certificate = true,
-        headers = { },
+        headers = NO_DEFAULT,
         healthy = {
           interval = 0, -- 0 = disabled by default
           http_statuses = { 200, 302 },
