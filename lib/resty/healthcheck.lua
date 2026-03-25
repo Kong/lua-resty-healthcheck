@@ -1078,17 +1078,24 @@ local function establish_connection(self, ip, port, hostname, hostheader, typ)
 end
 
 
--- Sends an HTTP/1.1 GET request over an already-connected socket and reports
--- the result via report_http_status / report_tcp_failure / report_timeout.
--- Connection: close is injected so the server closes the connection after
--- responding (health probes are one-shot).
-local function probe_http(self, sock, ip, port, hostname, hostheader)
+-- Sends an HTTP GET request over an already-connected socket.
+-- Returns the parsed HTTP status code (number), or nil if a transport-level
+-- error occurred (timeout / TCP failure are reported internally).
+-- @param http_version  "1.0" or "1.1" (default "1.1").  For "1.1",
+--   Connection: close is injected so the server closes the connection after
+--   responding (health probes are one-shot).
+local function probe_http(self, sock, ip, port, hostname, hostheader, http_version)
   local headers = build_http_headers(self)
   local path = self.checks.active.http_path
   local host = hostheader or hostname or ip
 
-  local request = ("GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n%s\r\n"):format(
-                    path, host, headers)
+  local request
+  if http_version == "1.0" then
+    request = ("GET %s HTTP/1.0\r\n%sHost: %s\r\n\r\n"):format(path, headers, host)
+  else
+    request = ("GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n%s\r\n"):format(
+                path, host, headers)
+  end
   self:log(DEBUG, "request head: ", request)
 
   local bytes, err = sock:send(request)
@@ -1096,9 +1103,11 @@ local function probe_http(self, sock, ip, port, hostname, hostheader)
     self:log(ERR, "failed to send http request to '", hostname, " (", ip, ":", port, ")': ", err)
     if err == "timeout" then
       sock:close()  -- timeout errors do not close the socket.
-      return self:report_timeout(ip, port, hostname, "active")
+      self:report_timeout(ip, port, hostname, "active")
+    else
+      self:report_tcp_failure(ip, port, hostname, "send", "active")
     end
-    return self:report_tcp_failure(ip, port, hostname, "send", "active")
+    return nil
   end
 
   local status_line
@@ -1107,9 +1116,11 @@ local function probe_http(self, sock, ip, port, hostname, hostheader)
     self:log(ERR, "failed to receive status line from '", hostname, " (",ip, ":", port, ")': ", err)
     if err == "timeout" then
       sock:close()  -- timeout errors do not close the socket.
-      return self:report_timeout(ip, port, hostname, "active")
+      self:report_timeout(ip, port, hostname, "active")
+    else
+      self:report_tcp_failure(ip, port, hostname, "receive", "active")
     end
-    return self:report_tcp_failure(ip, port, hostname, "receive", "active")
+    return nil
   end
 
   local from, to = re_find(status_line,
@@ -1126,7 +1137,7 @@ local function probe_http(self, sock, ip, port, hostname, hostheader)
   sock:close()
 
   self:log(DEBUG, "Reporting '", hostname, " (", ip, ":", port, ")' (got HTTP ", status, ")")
-  return self:report_http_status(ip, port, hostname, status, "active")
+  return status
 end
 
 
@@ -1144,7 +1155,56 @@ function checker:run_single_check(ip, port, hostname, hostheader)
     return self:report_success(ip, port, hostname, "active")
   end
 
-  return probe_http(self, sock, ip, port, hostname, hostheader)
+  -- Use cached version preference; default "1.1"
+  local target = get_target(self, ip, port, hostname)
+  local http_version = (target and target.http_version) or "1.1"
+
+  local status = probe_http(self, sock, ip, port, hostname, hostheader, http_version)
+  if not status then
+    return  -- error already reported inside probe_http
+  end
+
+  -- Version auto-detection:
+  -- 1. 505 = server doesn't support our version -> try the other (always, for self-healing)
+  -- 2. 426 on HTTP/1.0 = server wants upgrade -> try 1.1 (always, for self-healing)
+  -- 3. Any non-healthy status when no version cached -> try the other (handles non-standard servers)
+  local has_cached_version = target and target.http_version ~= nil
+  local is_healthy = self.checks.active.healthy.http_statuses[status]
+  local should_retry = (status == 505)
+                    or (status == 426 and http_version == "1.0")
+                    or (not is_healthy and not has_cached_version)
+
+  if should_retry then
+    local other_version = (http_version == "1.0") and "1.1" or "1.0"
+    self:log(WARN, "target '", hostname or "", " (", ip, ":", port,
+                   ")' returned ", status, " on HTTP/", http_version,
+                   ", retrying with HTTP/", other_version)
+
+    sock = establish_connection(self, ip, port, hostname, hostheader, typ)
+    if not sock then
+      return  -- failure already reported
+    end
+
+    local retry_status = probe_http(self, sock, ip, port, hostname, hostheader, other_version)
+    if not retry_status then
+      return  -- error already reported
+    end
+
+    -- Always cache after retry to prevent repeated retries:
+    -- If retry gave a healthy result, the other version works — adopt it.
+    -- Otherwise, stick with the original version and its status so that
+    -- health reporting reflects the version we actually cache.
+    if target then
+      if self.checks.active.healthy.http_statuses[retry_status] then
+        target.http_version = other_version
+        status = retry_status
+      else
+        target.http_version = http_version
+      end
+    end
+  end
+
+  return self:report_http_status(ip, port, hostname, status, "active")
 end
 
 -- executes a work package (a list of checks) sequentially
