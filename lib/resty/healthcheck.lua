@@ -1131,7 +1131,7 @@ local function probe_http(self, sock, ip, port, hostname, hostheader, http_versi
     status = tonumber(status_line:sub(from, to))
   else
     self:log(ERR, "bad status line from '", hostname, " (", ip, ":", port, ")': ", status_line)
-    -- note: 'status' will be reported as 'nil'
+    status = 0  -- report_http_status treats 0 as unhealthy
   end
 
   sock:close()
@@ -1141,13 +1141,70 @@ local function probe_http(self, sock, ip, port, hostname, hostheader, http_versi
 end
 
 
+-- Negotiates the HTTP version for a target based on the probe result.
+-- If the status suggests a version mismatch, retries with the other version.
+-- Updates the target's cached version preference.
+-- Returns the final status to report, or nil if a transport error occurred.
+local function negotiate_http_version(self, target, ip, port, hostname,
+                                      hostheader, typ, http_version, status)
+  local is_healthy = self.checks.active.healthy.http_statuses[status]
+  local has_cached_version = target and target.http_version ~= nil
+
+  -- Version auto-detection:
+  -- 1. 505 -> try the other version (always, for self-healing)
+  -- 2. 426 on HTTP/1.0 -> try HTTP/1.1 (always, for self-healing)
+  -- 3. Any non-healthy + no cache -> try the other (first-probe discovery)
+  local should_retry = (status == 505)
+                    or (status == 426 and http_version == "1.0")
+                    or (not is_healthy and not has_cached_version)
+
+  if not should_retry then
+    return status
+  end
+
+  local other_version = (http_version == "1.0") and "1.1" or "1.0"
+  self:log(WARN, "target '", hostname or "", " (", ip, ":", port,
+                 ")' returned ", status, " on HTTP/", http_version,
+                 ", retrying with HTTP/", other_version)
+
+  local sock = establish_connection(self, ip, port, hostname, hostheader, typ)
+  if not sock then
+    return nil
+  end
+
+  local retry_status = probe_http(self, sock, ip, port, hostname, hostheader, other_version)
+  if not retry_status then
+    return nil
+  end
+
+  -- Decide which status to report and cache the version preference.
+  -- If retry gave a healthy result, the other version works — adopt it.
+  -- Otherwise, stick with the original version and its status so that
+  -- health reporting reflects the version we actually cache.
+  local retry_is_healthy = self.checks.active.healthy.http_statuses[retry_status]
+  local final_status
+
+  if target then
+    if retry_is_healthy then
+      final_status = retry_status
+      target.http_version = other_version
+    else
+      final_status = status
+      target.http_version = http_version
+    end
+  end
+
+  return final_status
+end
+
+
 -- Runs a single healthcheck probe
 function checker:run_single_check(ip, port, hostname, hostheader)
   local typ = self.checks.active.type
 
   local sock = establish_connection(self, ip, port, hostname, hostheader, typ)
   if not sock then
-    return  -- failure already reported inside establish_connection
+    return
   end
 
   if typ == "tcp" then
@@ -1155,53 +1212,18 @@ function checker:run_single_check(ip, port, hostname, hostheader)
     return self:report_success(ip, port, hostname, "active")
   end
 
-  -- Use cached version preference; default "1.1"
   local target = get_target(self, ip, port, hostname)
   local http_version = (target and target.http_version) or "1.1"
 
   local status = probe_http(self, sock, ip, port, hostname, hostheader, http_version)
   if not status then
-    return  -- error already reported inside probe_http
+    return
   end
 
-  -- Version auto-detection:
-  -- 1. 505 = server doesn't support our version -> try the other (always, for self-healing)
-  -- 2. 426 on HTTP/1.0 = server wants upgrade -> try 1.1 (always, for self-healing)
-  -- 3. Any non-healthy status when no version cached -> try the other (handles non-standard servers)
-  local has_cached_version = target and target.http_version ~= nil
-  local is_healthy = self.checks.active.healthy.http_statuses[status]
-  local should_retry = (status == 505)
-                    or (status == 426 and http_version == "1.0")
-                    or (not is_healthy and not has_cached_version)
-
-  if should_retry then
-    local other_version = (http_version == "1.0") and "1.1" or "1.0"
-    self:log(WARN, "target '", hostname or "", " (", ip, ":", port,
-                   ")' returned ", status, " on HTTP/", http_version,
-                   ", retrying with HTTP/", other_version)
-
-    sock = establish_connection(self, ip, port, hostname, hostheader, typ)
-    if not sock then
-      return  -- failure already reported
-    end
-
-    local retry_status = probe_http(self, sock, ip, port, hostname, hostheader, other_version)
-    if not retry_status then
-      return  -- error already reported
-    end
-
-    -- Always cache after retry to prevent repeated retries:
-    -- If retry gave a healthy result, the other version works — adopt it.
-    -- Otherwise, stick with the original version and its status so that
-    -- health reporting reflects the version we actually cache.
-    if target then
-      if self.checks.active.healthy.http_statuses[retry_status] then
-        target.http_version = other_version
-        status = retry_status
-      else
-        target.http_version = http_version
-      end
-    end
+  status = negotiate_http_version(self, target, ip, port, hostname,
+                                  hostheader, typ, http_version, status)
+  if not status then
+    return
   end
 
   return self:report_http_status(ip, port, hostname, status, "active")
