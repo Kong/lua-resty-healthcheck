@@ -985,60 +985,18 @@ end
 --============================================================================
 
 
--- Runs a single healthcheck probe
-function checker:run_single_check(ip, port, hostname, hostheader)
-
-  local sock, err = ngx.socket.tcp()
-  if not sock then
-    self:log(ERR, "failed to create stream socket: ", err)
-    return
-  end
-
-  sock:settimeout(self.checks.active.timeout * 1000)
-
-  local ok
-  ok, err = sock:connect(ip, port)
-  if not ok then
-    if err == "timeout" then
-      sock:close()  -- timeout errors do not close the socket.
-      return self:report_timeout(ip, port, hostname, "active")
-    end
-    return self:report_tcp_failure(ip, port, hostname, "connect", "active")
-  end
-
-  if self.checks.active.type == "tcp" then
-    sock:close()
-    return self:report_success(ip, port, hostname, "active")
-  end
-
-  if self.checks.active.type == "https" then
-    local https_sni, session, err
-    https_sni = self.checks.active.https_sni or hostheader or hostname
-    if self.ssl_cert and self.ssl_key then
-      ok, err = sock:setclientcert(self.ssl_cert, self.ssl_key)
-
-      if not ok then
-        self:log(ERR, "failed to set client certificate: ", err)
-      end
-    end
-
-    session, err = sock:sslhandshake(nil, https_sni,
-                                     self.checks.active.https_verify_certificate)
-
-    if not session then
-      sock:close()
-      self:log(ERR, "failed SSL handshake with '", hostname or "", " (", ip, ":", port, ")', using server name (sni) '", https_sni, "': ", err)
-      return self:report_tcp_failure(ip, port, hostname, "connect", "active")
-    end
-
+-- Builds and caches the serialized user-configured headers string for HTTP/1.x probes.
+-- Uses ~= nil so that a cached empty string ("") is also a cache hit.
+local function build_http_headers(self)
+  if self.checks.active._headers_str ~= nil then
+    return self.checks.active._headers_str
   end
 
   local req_headers = self.checks.active.headers
   local headers
-  if self.checks.active._headers_str then
-    headers = self.checks.active._headers_str
-  elseif req_headers == nil then
-      headers = ""
+
+  if req_headers == nil then
+    headers = ""
   else
     local headers_length = nkeys(req_headers)
     if headers_length > 0 then
@@ -1065,22 +1023,91 @@ function checker:run_single_check(ip, port, hostname, hostheader)
         headers = headers .. "\r\n"
       end
     end
-    self.checks.active._headers_str = headers or ""
   end
 
+  self.checks.active._headers_str = headers or ""
+  return self.checks.active._headers_str
+end
+
+
+-- Establishes a TCP connection and optionally performs a TLS handshake for
+-- https type.  Returns the connected socket, or nil when a failure has
+-- already been reported via report_timeout / report_tcp_failure.
+local function establish_connection(self, ip, port, hostname, hostheader, typ)
+  local sock, err = ngx.socket.tcp()
+  if not sock then
+    self:log(ERR, "failed to create stream socket: ", err)
+    return nil
+  end
+
+  sock:settimeout(self.checks.active.timeout * 1000)
+
+  local ok
+  ok, err = sock:connect(ip, port)
+  if not ok then
+    if err == "timeout" then
+      sock:close()  -- timeout errors do not close the socket.
+      self:report_timeout(ip, port, hostname, "active")
+    else
+      self:report_tcp_failure(ip, port, hostname, "connect", "active")
+    end
+    return nil
+  end
+
+  if typ == "https" then
+    local https_sni = self.checks.active.https_sni or hostheader or hostname
+    if self.ssl_cert and self.ssl_key then
+      ok, err = sock:setclientcert(self.ssl_cert, self.ssl_key)
+      if not ok then
+        self:log(ERR, "failed to set client certificate: ", err)
+      end
+    end
+
+    local session
+    session, err = sock:sslhandshake(nil, https_sni,
+                                     self.checks.active.https_verify_certificate)
+    if not session then
+      sock:close()
+      self:log(ERR, "failed SSL handshake with '", hostname or "", " (", ip, ":", port, ")', using server name (sni) '", https_sni, "': ", err)
+      self:report_tcp_failure(ip, port, hostname, "connect", "active")
+      return nil
+    end
+  end
+
+  return sock
+end
+
+
+-- Sends an HTTP GET request over an already-connected socket.
+-- Returns the parsed HTTP status code (number), or nil if a transport-level
+-- error occurred (timeout / TCP failure are reported internally).
+-- @param http_version  "1.0" or "1.1" (default "1.1").  For "1.1",
+--   Connection: close is injected so the server closes the connection after
+--   responding (health probes are one-shot).
+local function probe_http(self, sock, ip, port, hostname, hostheader, http_version)
+  local headers = build_http_headers(self)
   local path = self.checks.active.http_path
-  local request = ("GET %s HTTP/1.0\r\n%sHost: %s\r\n\r\n"):format(path, headers, hostheader or hostname or ip)
+  local host = hostheader or hostname or ip
+
+  local request
+  if http_version == "1.0" then
+    request = ("GET %s HTTP/1.0\r\n%sHost: %s\r\n\r\n"):format(path, headers, host)
+  else
+    request = ("GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n%s\r\n"):format(
+                path, host, headers)
+  end
   self:log(DEBUG, "request head: ", request)
 
-  local bytes
-  bytes, err = sock:send(request)
+  local bytes, err = sock:send(request)
   if not bytes then
     self:log(ERR, "failed to send http request to '", hostname, " (", ip, ":", port, ")': ", err)
     if err == "timeout" then
       sock:close()  -- timeout errors do not close the socket.
-      return self:report_timeout(ip, port, hostname, "active")
+      self:report_timeout(ip, port, hostname, "active")
+    else
+      self:report_tcp_failure(ip, port, hostname, "send", "active")
     end
-    return self:report_tcp_failure(ip, port, hostname, "send", "active")
+    return nil
   end
 
   local status_line
@@ -1089,9 +1116,11 @@ function checker:run_single_check(ip, port, hostname, hostheader)
     self:log(ERR, "failed to receive status line from '", hostname, " (",ip, ":", port, ")': ", err)
     if err == "timeout" then
       sock:close()  -- timeout errors do not close the socket.
-      return self:report_timeout(ip, port, hostname, "active")
+      self:report_timeout(ip, port, hostname, "active")
+    else
+      self:report_tcp_failure(ip, port, hostname, "receive", "active")
     end
-    return self:report_tcp_failure(ip, port, hostname, "receive", "active")
+    return nil
   end
 
   local from, to = re_find(status_line,
@@ -1102,12 +1131,101 @@ function checker:run_single_check(ip, port, hostname, hostheader)
     status = tonumber(status_line:sub(from, to))
   else
     self:log(ERR, "bad status line from '", hostname, " (", ip, ":", port, ")': ", status_line)
-    -- note: 'status' will be reported as 'nil'
+    status = 0  -- report_http_status treats 0 as unhealthy
   end
 
   sock:close()
 
   self:log(DEBUG, "Reporting '", hostname, " (", ip, ":", port, ")' (got HTTP ", status, ")")
+  return status
+end
+
+
+-- Negotiates the HTTP version for a target based on the probe result.
+-- If the status suggests a version mismatch, retries with the other version.
+-- Updates the target's cached version preference.
+-- Returns the final status to report, or nil if a transport error occurred.
+local function negotiate_http_version(self, target, ip, port, hostname,
+                                      hostheader, typ, http_version, status)
+  local is_healthy = self.checks.active.healthy.http_statuses[status]
+
+  -- Version auto-detection (only for standard HTTP version codes):
+  -- 1. 505 (HTTP Version Not Supported) -> try the other version
+  -- 2. 426 (Upgrade Required) on HTTP/1.0 -> try HTTP/1.1
+  -- Both triggers are gated on `not is_healthy` to respect user configuration.
+  -- Both triggers fire regardless of cache state, enabling self-healing when
+  -- a server changes its supported HTTP version.
+  local should_retry = not is_healthy and
+                       ((status == 505) or
+                        (status == 426 and http_version == "1.0"))
+
+  if not should_retry then
+    return status
+  end
+
+  local other_version = (http_version == "1.0") and "1.1" or "1.0"
+  self:log(WARN, "target '", hostname or "", " (", ip, ":", port,
+                 ")' returned ", status, " on HTTP/", http_version,
+                 ", retrying with HTTP/", other_version)
+
+  local sock = establish_connection(self, ip, port, hostname, hostheader, typ)
+  if not sock then
+    return nil
+  end
+
+  local retry_status = probe_http(self, sock, ip, port, hostname, hostheader, other_version)
+  if not retry_status then
+    return nil
+  end
+
+  -- Decide which status to report and cache the version preference.
+  -- If retry gave a healthy result, the other version works — adopt it.
+  -- Otherwise, stick with the original version and its status so that
+  -- health reporting reflects the version we actually cache.
+  local retry_is_healthy = self.checks.active.healthy.http_statuses[retry_status]
+  local final_status
+
+  if target then
+    if retry_is_healthy then
+      final_status = retry_status
+      target.http_version = other_version
+    else
+      final_status = status
+      target.http_version = http_version
+    end
+  end
+
+  return final_status
+end
+
+
+-- Runs a single healthcheck probe
+function checker:run_single_check(ip, port, hostname, hostheader)
+  local typ = self.checks.active.type
+
+  local sock = establish_connection(self, ip, port, hostname, hostheader, typ)
+  if not sock then
+    return
+  end
+
+  if typ == "tcp" then
+    sock:close()
+    return self:report_success(ip, port, hostname, "active")
+  end
+
+  local target = get_target(self, ip, port, hostname)
+  local http_version = (target and target.http_version) or "1.1"
+
+  local status = probe_http(self, sock, ip, port, hostname, hostheader, http_version)
+  if not status then
+    return
+  end
+
+  status = negotiate_http_version(self, target, ip, port, hostname,
+                                  hostheader, typ, http_version, status)
+  if not status then
+    return
+  end
 
   return self:report_http_status(ip, port, hostname, status, "active")
 end

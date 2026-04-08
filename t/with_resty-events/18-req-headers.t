@@ -79,9 +79,10 @@ true
 --- error_log
 checking healthy targets: nothing to do
 checking healthy targets: #1
-GET /status HTTP/1.0
-User-Agent: curl/7.29.0
+GET /status HTTP/1.1
 Host: 127.0.0.1
+Connection: close
+User-Agent: curl/7.29.0
 
 
 
@@ -128,9 +129,10 @@ true
 --- error_log
 checking healthy targets: nothing to do
 checking healthy targets: #1
-GET /status HTTP/1.0
-User-Agent: curl
+GET /status HTTP/1.1
 Host: 127.0.0.1
+Connection: close
+User-Agent: curl
 
 
 === TEST 3: headers: { ["User-Agent"] = "curl" }
@@ -176,9 +178,10 @@ true
 --- error_log
 checking healthy targets: nothing to do
 checking healthy targets: #1
-GET /status HTTP/1.0
-User-Agent: curl
+GET /status HTTP/1.1
 Host: 127.0.0.1
+Connection: close
+User-Agent: curl
 
 
 
@@ -225,9 +228,10 @@ true
 --- error_log
 checking healthy targets: nothing to do
 checking healthy targets: #1
-GET /status HTTP/1.0
-User-Agent: curl
+GET /status HTTP/1.1
 Host: 127.0.0.1
+Connection: close
+User-Agent: curl
 
 
 
@@ -274,7 +278,8 @@ true
 --- error_log
 checking healthy targets: nothing to do
 checking healthy targets: #1
-GET /status HTTP/1.0
+GET /status HTTP/1.1
+Host: 127.0.0.1
+Connection: close
 User-Agent: curl
 User-Agent: nginx
-Host: 127.0.0.1
