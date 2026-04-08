@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * 38;
+plan tests => repeat_each() * 41;
 
 my $pwd = cwd();
 
@@ -328,7 +328,7 @@ retrying with HTTP/
 
 
 
-=== TEST 6: 426 on HTTP/1.1, retried once then cached (server wants HTTP/2)
+=== TEST 6: 426 on HTTP/1.1, no retry (downgrading to 1.0 won't help)
 --- http_config eval
 qq{
     $::HttpConfig
@@ -377,12 +377,12 @@ qq{
 GET /t
 --- response_body
 true
---- error_log
+--- no_error_log
 retrying with HTTP/
 
 
 
-=== TEST 7: non-standard server, returns 400 on HTTP/1.1, 200 on HTTP/1.0
+=== TEST 7: non-standard server returns 400 on HTTP/1.1, no retry (only 505/426 trigger retry)
 --- http_config eval
 qq{
     $::HttpConfig
@@ -427,19 +427,20 @@ qq{
             ngx.sleep(2)
             local ok, err = checker:add_target("127.0.0.1", 2114, nil, false)
             ngx.sleep(0.6)
-            ngx.say(checker:get_target_status("127.0.0.1", 2114))  -- true
+            -- 400 is not in healthy or unhealthy lists, no retry, status unchanged
+            ngx.say(checker:get_target_status("127.0.0.1", 2114))  -- false
         }
     }
 --- request
 GET /t
 --- response_body
-true
---- error_log
-returned 400 on HTTP/1.1, retrying with HTTP/1.0
+false
+--- no_error_log
+retrying with HTTP/
 
 
 
-=== TEST 8: genuinely unhealthy server (500 on both versions), retries once then caches
+=== TEST 8: genuinely unhealthy server (500), no version retry
 --- http_config eval
 qq{
     $::HttpConfig
@@ -491,6 +492,8 @@ unhealthy HTTP increment (1/3) for '127.0.0.1(127.0.0.1:2114)'
 unhealthy HTTP increment (2/3) for '127.0.0.1(127.0.0.1:2114)'
 unhealthy HTTP increment (3/3) for '127.0.0.1(127.0.0.1:2114)'
 event: target status '127.0.0.1(127.0.0.1:2114)' from 'true' to 'false'
+--- no_error_log
+retrying with HTTP/
 
 
 
@@ -504,9 +507,10 @@ qq{
         location = /status {
             content_by_lua_block {
                 if ngx.var.server_protocol == "HTTP/1.1" then
-                    return ngx.exit(418)
+                    return ngx.exit(505)
                 end
-                ngx.exit(500)
+                -- Retry with HTTP/1.0 also fails (418 is not in any list)
+                ngx.exit(418)
             }
         }
     }
@@ -539,17 +543,18 @@ qq{
             ngx.sleep(2)
             local ok, err = checker:add_target("127.0.0.1", 2114, nil, true)
             ngx.sleep(0.6)
-            -- 418 (original) is not in any list, so target stays healthy.
-            -- Without the fix, retry's 500 would be reported and cause
-            -- unhealthy increments.
-            ngx.say(checker:get_target_status("127.0.0.1", 2114))  -- true
+            -- Retry gets 418 (not healthy), so original 505 is reported.
+            -- 505 is in the default unhealthy list, causing unhealthy increments.
+            -- If retry's 418 were incorrectly reported, no increments would happen.
+            ngx.say(checker:get_target_status("127.0.0.1", 2114))  -- false
         }
     }
 --- request
 GET /t
 --- response_body
-true
+false
 --- error_log
-returned 418 on HTTP/1.1, retrying with HTTP/1.0
---- no_error_log
-unhealthy HTTP increment
+returned 505 on HTTP/1.1, retrying with HTTP/1.0
+unhealthy HTTP increment (1/3) for '127.0.0.1(127.0.0.1:2114)'
+unhealthy HTTP increment (2/3) for '127.0.0.1(127.0.0.1:2114)'
+unhealthy HTTP increment (3/3) for '127.0.0.1(127.0.0.1:2114)'

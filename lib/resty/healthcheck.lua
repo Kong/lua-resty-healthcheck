@@ -1148,15 +1148,16 @@ end
 local function negotiate_http_version(self, target, ip, port, hostname,
                                       hostheader, typ, http_version, status)
   local is_healthy = self.checks.active.healthy.http_statuses[status]
-  local has_cached_version = target and target.http_version ~= nil
 
-  -- Version auto-detection:
-  -- 1. 505 -> try the other version (always, for self-healing)
-  -- 2. 426 on HTTP/1.0 -> try HTTP/1.1 (always, for self-healing)
-  -- 3. Any non-healthy + no cache -> try the other (first-probe discovery)
-  local should_retry = (status == 505)
-                    or (status == 426 and http_version == "1.0")
-                    or (not is_healthy and not has_cached_version)
+  -- Version auto-detection (only for standard HTTP version codes):
+  -- 1. 505 (HTTP Version Not Supported) -> try the other version
+  -- 2. 426 (Upgrade Required) on HTTP/1.0 -> try HTTP/1.1
+  -- Both triggers are gated on `not is_healthy` to respect user configuration.
+  -- Both triggers fire regardless of cache state, enabling self-healing when
+  -- a server changes its supported HTTP version.
+  local should_retry = not is_healthy and
+                       ((status == 505) or
+                        (status == 426 and http_version == "1.0"))
 
   if not should_retry then
     return status
