@@ -907,14 +907,23 @@ function checker:set_all_target_statuses_for_hostname(hostname, port, is_healthy
 
   local all_ok = true
   local errs = {}
+  local matched = 0
+
   for _, target in ipairs(self.targets) do
     if target.port == port and target.hostname == hostname then
+      matched = matched + 1
+
       local ok, err = self:set_target_status(target.ip, port, hostname, is_healthy)
       if not ok then
         all_ok = nil
         table.insert(errs, err)
       end
     end
+  end
+
+  if matched == 0 then
+    -- sync issue: warn, but return success (mirrors set_target_status)
+    self:log(WARN, "trying to set status for targets that are not in the list: ", hostname, ":", port)
   end
 
   return all_ok, #errs > 0 and table_concat(errs, "; ") or nil
