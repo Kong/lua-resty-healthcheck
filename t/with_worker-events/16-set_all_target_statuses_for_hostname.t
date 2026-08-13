@@ -3,7 +3,7 @@ use Cwd qw(cwd);
 
 workers(1);
 
-plan tests => repeat_each() * blocks() * 2;
+plan tests => repeat_each() * blocks() * 2 + 1;
 
 my $pwd = cwd();
 
@@ -199,3 +199,35 @@ false
 false
 true
 false
+
+
+
+=== TEST 5: set_all_target_statuses_for_hostname() warns when nothing matches
+--- http_config eval
+qq{
+    $::HttpConfig
+}
+--- config
+    location = /t {
+        content_by_lua_block {
+            local we = require "resty.worker.events"
+            assert(we.configure{ shm = "my_worker_events", interval = 0.1 })
+            local healthcheck = require("resty.healthcheck")
+            local checker = healthcheck.new({
+                name = "testing",
+                shm_name = "test_shm"
+            })
+            ngx.sleep(0.1) -- wait for initial timers to run once
+            local ok, err = checker:set_all_target_statuses_for_hostname("rush", 2112, false)
+            ngx.say(ok)   -- true
+            ngx.say(err)  -- nil
+        }
+    }
+--- request
+GET /t
+--- response_body
+true
+nil
+--- error_log
+trying to set status for targets that are not in the list: rush:2112
+
